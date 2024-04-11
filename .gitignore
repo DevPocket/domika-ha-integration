@@ -11,3 +11,5 @@
 
 # File-based project format
 *.iws
+/HA_Pusher_events.db
+/HA_Pusher_subscriptions.db

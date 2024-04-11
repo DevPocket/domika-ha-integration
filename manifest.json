@@ -1,0 +1,14 @@
+{
+  "domain": "jester",
+  "name": "Jester Integration",
+  "version": "0.1",
+  "after_dependencies": ["http"],
+  "codeowners": ["@bealex"],
+  "config_flow": true,
+  "single_config_entry": true,
+  "dependencies": ["websocket_api"],
+  "requirements": ["aioapns"],
+  "documentation": "https://github.com/bealex",
+  "integration_type": "service",
+  "quality_scale": "internal"
+}

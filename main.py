@@ -10,7 +10,7 @@ EVENT_CONFIRMER = confirm_events.EventConfirmer()
 if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     pusher = push.Pusher("", True)
-    pusher.init_ios_notifier("/Users/bmikle/SourceCode/jester-ios/HomeAssistantPusher/key.p8", None, True)
+    pusher.init_ios_notifier("/Users/bmikle/SourceCode/Domika/domika-ha-integration/HA_Pusher/key.p8", None, True)
     bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
     pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y"]})
     # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))

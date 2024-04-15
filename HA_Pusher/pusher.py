@@ -29,73 +29,74 @@ class Pusher:
     # By default, DB file will be created in current folder and named HA_Pusher.db
     # If you want to create in different place, pass string in format: "file:/Users/alex/DB_Folder/"
     def __init__(self, database_path="", recreate_db=False):
-        # Connect to db, if it does not exist — create one
-        self.db = sqlite3.connect(database_path + SUBSCRIPTIONS_DATABASE_NAME)
-        self.db.row_factory = sqlite3.Row
-        self.cur = self.db.cursor()
+        with LOCK_ALL:
+            # Connect to db, if it does not exist — create one
+            self.db = sqlite3.connect(database_path + SUBSCRIPTIONS_DATABASE_NAME)
+            self.db.row_factory = sqlite3.Row
+            self.cur = self.db.cursor()
 
-        self.cur.execute("ATTACH DATABASE ? as EVENTS", (database_path + EVENTS_DATABASE_NAME, ))
-        self.cur.execute("PRAGMA foreign_keys = 1")
+            self.cur.execute("ATTACH DATABASE ? as EVENTS", (database_path + EVENTS_DATABASE_NAME, ))
+            self.cur.execute("PRAGMA foreign_keys = 1")
 
-        if recreate_db:
-            # The order is important because of the foreign key in subscriptions
+            if recreate_db:
+                # The order is important because of the foreign key in subscriptions
+                self.cur.executescript("""
+                    DROP TABLE if exists EVENTS.notifications;
+                    DROP TABLE if exists EVENTS.push_data;
+                    DROP TABLE if exists EVENTS.events;
+                    DROP TABLE if exists subscriptions;
+                    DROP TABLE if exists devices;
+                    """)
+
             self.cur.executescript("""
-                DROP TABLE if exists EVENTS.notifications;
-                DROP TABLE if exists EVENTS.push_data;
-                DROP TABLE if exists EVENTS.events;
-                DROP TABLE if exists subscriptions;
-                DROP TABLE if exists devices;
-                """)
-
-        self.cur.executescript("""
-            CREATE TABLE if not exists devices (
-                user_id TEXT NOT NULL, 
-                install_id TEXT PRIMARY KEY NOT NULL, 
-                token TEXT UNIQUE NOT NULL, 
-                platform TEXT NOT NULL, 
-                environment TEXT NOT NULL
-                ); 
-                
-            CREATE TABLE if not exists subscriptions (
-                install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
-                entity_id TEXT NOT NULL,
-                attribute TEXT NOT NULL,
-                UNIQUE(install_id, entity_id, attribute)
-                ); 
-                
-            CREATE TABLE if not exists EVENTS.events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                entity_id TEXT NOT NULL,
-                attribute TEXT NOT NULL,
-                value TEXT NOT NULL,
-                context_id TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                UNIQUE(entity_id, attribute)
-                ); 
-                
-            CREATE TABLE if not exists EVENTS.push_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                install_id TEXT NOT NULL,
-                token TEXT NOT NULL, 
-                platform TEXT NOT NULL, 
-                environment TEXT NOT NULL,
-                entity_id TEXT NOT NULL,
-                attribute TEXT NOT NULL,
-                value TEXT NOT NULL,
-                context_id TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                event_id INTEGER NOT NULL,
-                UNIQUE(token, entity_id, attribute)
-                ); 
-                
-            CREATE TABLE if not exists EVENTS.notifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                token TEXT NOT NULL, 
-                platform TEXT NOT NULL, 
-                environment TEXT NOT NULL,
-                data TEXT NOT NULL
-                ); 
-                """)
+                CREATE TABLE if not exists devices (
+                    user_id TEXT NOT NULL, 
+                    install_id TEXT PRIMARY KEY NOT NULL, 
+                    token TEXT UNIQUE NOT NULL, 
+                    platform TEXT NOT NULL, 
+                    environment TEXT NOT NULL
+                    ); 
+                    
+                CREATE TABLE if not exists subscriptions (
+                    install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
+                    entity_id TEXT NOT NULL,
+                    attribute TEXT NOT NULL,
+                    UNIQUE(install_id, entity_id, attribute)
+                    ); 
+                    
+                CREATE TABLE if not exists EVENTS.events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                    entity_id TEXT NOT NULL,
+                    attribute TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    context_id TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    UNIQUE(entity_id, attribute)
+                    ); 
+                    
+                CREATE TABLE if not exists EVENTS.push_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                    install_id TEXT NOT NULL,
+                    token TEXT NOT NULL, 
+                    platform TEXT NOT NULL, 
+                    environment TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    attribute TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    context_id TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    UNIQUE(token, entity_id, attribute)
+                    ); 
+                    
+                CREATE TABLE if not exists EVENTS.notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                    token TEXT NOT NULL, 
+                    platform TEXT NOT NULL, 
+                    environment TEXT NOT NULL,
+                    data TEXT NOT NULL
+                    ); 
+                    """)
 
 
     def init_ios_notifier(self, client_cert_uri, loop, use_sandbox):

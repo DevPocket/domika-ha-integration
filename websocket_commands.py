@@ -93,22 +93,25 @@ def websocket_jester_resubscribe(
     if install_id:
         for entity_id in msg.get("subscriptions"):
             state = hass.states.get(entity_id)
-            state_bytes = orjson.dumps(state.as_compressed_state, default=json_encoder_jester, option=orjson.OPT_NON_STR_KEYS)
-            compressed_state = orjson.loads(state_bytes)
-            # LOGGER.debug(f"### state: {compressed_state}")
-            dict_attributes = {}
-            make_dictionary(compressed_state, "", dict_attributes)
-            [dict_attributes.pop(k, None) for k in ["c", "lc", "lu"]]
-            dict_attributes["entity_id"] = entity_id
-            time_updated = max(state.last_changed, state.last_updated)
-            # LOGGER.debug(f"""### websocket_jester_resubscribe {install_id}, {dict_attributes}, {EventOrigin.local}, {state.context}, {time_updated} """)
-            hass.bus.async_fire(
-                f"jester_state_changed_{install_id}",
-                dict_attributes,
-                EventOrigin.local,
-                state.context,
-                time_updated.timestamp()
-            )
+            if state:
+                state_bytes = orjson.dumps(state.as_compressed_state, default=json_encoder_jester, option=orjson.OPT_NON_STR_KEYS)
+                compressed_state = orjson.loads(state_bytes)
+                # LOGGER.debug(f"### state: {compressed_state}")
+                dict_attributes = {}
+                make_dictionary(compressed_state, "", dict_attributes)
+                [dict_attributes.pop(k, None) for k in ["c", "lc", "lu"]]
+                dict_attributes["entity_id"] = entity_id
+                time_updated = max(state.last_changed, state.last_updated)
+                # LOGGER.debug(f"""### websocket_jester_resubscribe {install_id}, {dict_attributes}, {EventOrigin.local}, {state.context}, {time_updated} """)
+                hass.bus.async_fire(
+                    f"jester_state_changed_{install_id}",
+                    dict_attributes,
+                    EventOrigin.local,
+                    state.context,
+                    time_updated.timestamp()
+                )
+            else:
+                LOGGER.error(f"websocket_jester_resubscribe requesting state of unknown entity: {entity_id}")
 
     pusher = push.Pusher("")
     pusher.resubscribe(

@@ -73,7 +73,7 @@ def forward_event(event):
             # Check if any install_ids are subscribed for these attributes.
             # If so, fire the event to those install_ids for app to catch.
             install_ids = pusher.install_ids_for_event(entity_id, attributes)
-            LOGGER.debug(f"### install_ids_for_event: {install_ids}")
+            LOGGER.debug(f"install_ids_for_event: {install_ids}")
             if install_ids:
                 fire_events_to_install_ids(install_ids)
 

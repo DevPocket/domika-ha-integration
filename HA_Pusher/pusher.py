@@ -1,7 +1,6 @@
 # Pusher
 from homeassistant.core import callback
 
-from . import notifier_ios
 from . import push_logger
 from .confirm_events import *
 from .const import *
@@ -11,6 +10,7 @@ import traceback
 import sys
 from uuid import uuid4
 import json
+import requests
 
 import threading
 LOCK_ALL = threading.Lock()
@@ -23,9 +23,6 @@ CURRENT_DB_VERSION: int = 2
 class Pusher:
     db = None
     cur = None
-    ios_notifier_sandbox = None
-    ios_notifier_production = None
-
 
     # By default, DB file will be created in current folder and named HA_Pusher.db
     # If you want to create in different place, pass string in format: "file:/Users/alex/DB_Folder/"
@@ -121,12 +118,6 @@ class Pusher:
                 self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
-
-    def init_ios_notifier(self, client_cert_uri, loop, use_sandbox):
-        if use_sandbox:
-            self.ios_notifier_sandbox = notifier_ios.Notifier_ios(client_cert_uri, loop, True)
-        else:
-            self.ios_notifier_production = notifier_ios.Notifier_ios(client_cert_uri, loop, False)
 
 
     def close_connection(self):
@@ -388,7 +379,7 @@ class Pusher:
 
                     # New token or too long — send push with data
                     if current_token != row["token"] or len(data) > 2000:
-                        self.add_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
+                        self.send_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
                         data = ""
                         current_token = row["token"]
                         current_environment = row["environment"]
@@ -407,55 +398,21 @@ class Pusher:
                     # data += f'"{row["attribute"]}":"{row["value"]}",'
                     data += f""""{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},"""
                 if len(data) > 0:
-                    self.add_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
+                    self.send_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
         # No matter what — remove expired.
         event_confirmer.remove_expired()
 
-
-    def add_notification_ios(self, environment, token, data):
-        push_logger.log_debug(f"add_notification_ios, environment={environment}, token={token}, data={data}")
-
-        self.cur.execute(""" 
-            INSERT INTO EVENTS.notifications (token, platform, environment, data)
-            VALUES (?, ?, ?, ?)
-            ;""", [token, IOS_PLATFORM, environment, data])
-        self.db.commit()
-        self.send_push_notifications_ios()
+    def send_notification_ios(self, environment, token, data):
+        push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
+        r = requests.post('http://127.0.0.1:5000/add_notification_ios',
+                          json={"environment": environment, "token": token, "data": data})
+        push_logger.log_debug(f"send_notification_ios result: {r.status_code}")
 
 
-    def send_push_notifications_ios(self):
-        push_logger.log_debug(f"send_push_notifications_ios")
-
-        db_res = self.cur.execute("""
-            SELECT id, token, environment, data 
-            FROM EVENTS.notifications
-            WHERE platform = ?
-            ;""", [IOS_PLATFORM])
-        res = list(db_res.fetchall())
-
-        for (id, token, environment, data) in res:
-            if environment == "sandbox":
-                if self.ios_notifier_sandbox is None:
-                    push_logger.log_error("Sandbox iOS notifier is not set up. Use init_notifier")
-                else:
-                    self.ios_notifier_sandbox.send_push_ios(token, data, self.send_push_notifications_ios_callback)
-            else:
-                if self.ios_notifier_production is None:
-                    push_logger.log_error("Production iOS notifier is not set up. Use init_notifier")
-                else:
-                    self.ios_notifier_production.send_push_ios(token, data, self.send_push_notifications_ios_callback)
-
-        self.cur.execute("""
-            DELETE FROM EVENTS.notifications
-            WHERE platform = ?
-            ;""", [IOS_PLATFORM])
-        self.db.commit()
-
-
-    def send_push_notifications_ios_callback(self, token: str, status: str):
-        push_logger.log_debug(f"send_push_notifications_ios_callback, token: {token}, status: {status}")
-        if status == "410":
-            TOKENS_TO_DELETE.add(token)
+    # def send_push_notifications_ios_callback(self, token: str, status: str):
+    #     push_logger.log_debug(f"send_push_notifications_ios_callback, token: {token}, status: {status}")
+    #     if status == "410":
+    #         TOKENS_TO_DELETE.add(token)

@@ -23,6 +23,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_jester_update_push_token)
     websocket_api.async_register_command(hass, websocket_jester_delete_push_token)
     websocket_api.async_register_command(hass, websocket_jester_resubscribe)
+    websocket_api.async_register_command(hass, websocket_jester_resubscribe_push)
     websocket_api.async_register_command(hass, websocket_jester_confirm_event)
     websocket_api.async_register_command(hass, websocket_jester_critical_sensors)
     event.async_track_time_interval(hass, generate_push_notifications_ios, UPDATE_INTERVAL, cancel_on_shutdown=True)

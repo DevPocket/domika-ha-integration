@@ -21,7 +21,7 @@ class Notifier_ios:
             key = client_cert_uri,
             key_id = "2V43S8PRK7",
             team_id = "R6R7D9LUCJ",
-            topic = "com.devpocket.test.jester",  # Bundle ID
+            topic = "com.devpocket.domika.ios",  # Bundle ID
             use_sandbox = use_sandbox
         )
 

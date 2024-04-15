@@ -13,10 +13,10 @@ from uuid import uuid4
 import json
 
 import threading
-# LOCK_SUBSCRIPTIONS = threading.Lock()
-# LOCK_EVENTS = threading.Lock()
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
+
+CURRENT_DB_VERSION: int = 2
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -25,6 +25,7 @@ class Pusher:
     cur = None
     ios_notifier_sandbox = None
     ios_notifier_production = None
+
 
     # By default, DB file will be created in current folder and named HA_Pusher.db
     # If you want to create in different place, pass string in format: "file:/Users/alex/DB_Folder/"
@@ -47,6 +48,8 @@ class Pusher:
                     DROP TABLE if exists subscriptions;
                     DROP TABLE if exists devices;
                     """)
+                self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
+
 
             self.cur.executescript("""
                 CREATE TABLE if not exists devices (
@@ -61,6 +64,7 @@ class Pusher:
                     install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
                     entity_id TEXT NOT NULL,
                     attribute TEXT NOT NULL,
+                    need_push INTEGER NOT NULL,
                     UNIQUE(install_id, entity_id, attribute)
                     ); 
                     
@@ -97,7 +101,26 @@ class Pusher:
                     data TEXT NOT NULL
                     ); 
                     """)
+            self.update_db()
 
+
+    def update_db(self):
+        def update_db_1_2():
+            self.cur.executescript("""
+                ALTER TABLE subscriptions
+                ADD COLUMN need_push INTEGER NOT NULL DEFAULT (0)
+            """)
+
+        res = self.cur.execute("PRAGMA user_version")
+        db_version = int(res.fetchone()[0]) or 1
+        if db_version < CURRENT_DB_VERSION:
+            push_logger.log_debug(f"user_version: {db_version}, CURRENT_DB_VERSION: {CURRENT_DB_VERSION}")
+            try:
+                if db_version == 1:
+                    update_db_1_2()
+                self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
+            except sqlite3.Error as er:
+                push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
     def init_ios_notifier(self, client_cert_uri, loop, use_sandbox):
         if use_sandbox:
@@ -142,7 +165,6 @@ class Pusher:
         if not user_id or not token or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id: {user_id}, token: {token}, platform: {platform}, environment: {environment} ")
         else:
-            # with LOCK_SUBSCRIPTIONS:
             with LOCK_ALL:
                 res = self.cur.execute("""
                     SELECT install_id, user_id, token, platform, environment
@@ -172,7 +194,6 @@ class Pusher:
 
     def remove_push_notification_token(self, install_id):
         push_logger.log_debug(f"remove_push_notification_token, install_id={install_id}")
-        # with LOCK_SUBSCRIPTIONS:
         with LOCK_ALL:
             if not install_id:
                 push_logger.log_error(f"remove_push_notification_token: install_id is empty, no record was removed: install_id: {install_id} ")
@@ -183,7 +204,6 @@ class Pusher:
 
     def resubscribe(self, install_id, subscriptions):
         push_logger.log_debug(f"resubscribe, install_id={install_id}, subscriptions={subscriptions}")
-        # with LOCK_SUBSCRIPTIONS:
         with LOCK_ALL:
             if not install_id or not subscriptions:
                 push_logger.log_error(f"resubscribe: one of the fields is empty, no record was updated: install_id: {install_id}, subscriptions={subscriptions} ")
@@ -192,13 +212,43 @@ class Pusher:
                 for entity_id in subscriptions:
                     attributes = subscriptions.get(entity_id)
                     for att in attributes:
-                        data.append((install_id, entity_id, att))
+                        data.append((install_id, entity_id, att, 0))
 
                 try:
                     self.cur.execute("DELETE FROM subscriptions WHERE install_id = ? ; ", [install_id])
                     self.cur.executemany("""
-                        INSERT INTO subscriptions (install_id, entity_id, attribute) 
-                        VALUES (?, ?, ?)
+                        INSERT INTO subscriptions (install_id, entity_id, attribute, need_push) 
+                        VALUES (?, ?, ?, ?)
+                        ;""", data)
+                    self.db.commit()
+                except sqlite3.Error as er:
+                    push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
+
+
+    def resubscribe_push(self, install_id, subscriptions):
+        push_logger.log_debug(f"resubscribe_push, install_id={install_id}, subscriptions={subscriptions}")
+        with LOCK_ALL:
+            if not install_id or not subscriptions:
+                push_logger.log_error(f"resubscribe_push: one of the fields is empty, no record was updated: install_id: {install_id}, subscriptions={subscriptions} ")
+            else:
+                self.cur.execute("""
+                    UPDATE subscriptions
+                    SET need_push = 0
+                    ;""")
+
+                data = []
+                for entity_id in subscriptions:
+                    attributes = subscriptions.get(entity_id)
+                    for att in attributes:
+                        data.append((install_id, entity_id, att))
+
+                try:
+                    self.cur.executemany("""
+                        UPDATE subscriptions
+                        SET need_push = 1
+                        WHERE install_id = ? AND 
+                              entity_id  = ? AND
+                              attribute = ? 
                         ;""", data)
                     self.db.commit()
                 except sqlite3.Error as er:
@@ -207,7 +257,6 @@ class Pusher:
 
     def install_ids_for_event(self, entity_id: str, attributes: set) -> list:
         push_logger.log_debug(f"install_ids_for_event, entity_id={entity_id}, attributes={attributes}")
-        # with LOCK_SUBSCRIPTIONS:
         with LOCK_ALL:
             if not entity_id or not attributes:
                 push_logger.log_error(f"install_ids_for_event: one of the fields is empty, no record was updated: entity_id={entity_id}, attributes={attributes} ")
@@ -253,7 +302,6 @@ class Pusher:
         if not entity_id or not attributes or not timestamp:
             push_logger.log_error(f"add_event: one of the fields is empty, no record was updated: entity_id: {entity_id}, attributes: {attributes}, timestamp: {timestamp} ")
         else:
-            # with LOCK_EVENTS:
             with LOCK_ALL:
                 data = []
                 for element in attributes:
@@ -281,11 +329,12 @@ class Pusher:
                 INSERT INTO EVENTS.push_data (install_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp, event_id) 
                     SELECT d.install_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp, e.id 
                     FROM events e
-                        JOIN subscriptions s
-                        ON e.entity_id = s.entity_id AND
-                           e.attribute = s.attribute
-                        JOIN devices d
-                        ON s.install_id = d.install_id
+                        JOIN subscriptions s ON
+                            e.entity_id = s.entity_id AND
+                            e.attribute = s.attribute
+                        JOIN devices d ON
+                            s.install_id = d.install_id
+                    WHERE s.need_push = 1
                 ON CONFLICT(token, entity_id, attribute) DO UPDATE 
                     SET value = excluded.value,
                         timestamp = excluded.timestamp
@@ -300,7 +349,6 @@ class Pusher:
 
     def generate_push_notifications_ios(self, event_confirmer: EventConfirmer):
         push_logger.log_debug(f"generate_push_notifications_ios, event_confirmer={event_confirmer}")
-        # with LOCK_EVENTS:
         with LOCK_ALL:
             try:
                 db_res = self.cur.execute("""

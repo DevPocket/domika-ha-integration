@@ -120,6 +120,34 @@ def websocket_jester_resubscribe(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "jester/resubscribe_push",
+        vol.Required("install_id"): str,
+        vol.Required("subscriptions"): dict[str, set],
+    }
+)
+@callback
+def websocket_jester_resubscribe_push(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    LOGGER.debug(f'Got websocket message "resubscribe_push", data: {msg}')
+    install_id = msg.get("install_id")
+
+    connection.send_result(
+        msg.get("id"), {}
+    )
+
+    pusher = push.Pusher("")
+    pusher.resubscribe_push(
+        install_id,
+        msg.get("subscriptions")
+    )
+    pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "jester/confirm_event",
         vol.Required("install_id"): str,
         vol.Required("context_id"): str

@@ -13,12 +13,13 @@ if __name__ == '__main__':
     pusher.init_ios_notifier("/Users/bmikle/SourceCode/Domika/domika-ha-integration/HA_Pusher/key.p8", None, True)
     bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
     pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y"]})
+    pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["Y"]})
     # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
 
     pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
     pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
     # EVENT_CONFIRMER.add_confirmation(bmikle_id,"cont2")
-    pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
-    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    # pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
+    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
 
     # print(EVENT_CONFIRMER)

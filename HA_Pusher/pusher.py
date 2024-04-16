@@ -16,7 +16,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 2
+CURRENT_DB_VERSION: int = 3
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -99,14 +99,20 @@ class Pusher:
                 ALTER TABLE subscriptions
                 ADD COLUMN need_push INTEGER NOT NULL DEFAULT (0)
             """)
+        def update_db_2_3():
+            self.cur.executescript("""
+                DROP TABLE if exists EVENTS.notifications
+            """)
 
         res = self.cur.execute("PRAGMA user_version")
         db_version = int(res.fetchone()[0]) or 1
         if db_version < CURRENT_DB_VERSION:
             push_logger.log_debug(f"user_version: {db_version}, CURRENT_DB_VERSION: {CURRENT_DB_VERSION}")
             try:
-                if db_version == 1:
+                if db_version < 2:
                     update_db_1_2()
+                if db_version < 3:
+                    update_db_2_3()
                 self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")

@@ -1,4 +1,4 @@
-"""Config flow for Jester integration."""
+"""Config flow for Domika integration."""
 from __future__ import annotations
 
 import asyncio
@@ -18,7 +18,7 @@ from .const import (
     LOGGER
 )
 
-JESTER_SCHEMA = vol.Schema(
+DOMIKA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_TOKEN): str
     }
@@ -41,8 +41,8 @@ async def _validate_input(
 
 
 
-class JesterConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Jester."""
+class DomikaConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Domika."""
 
     VERSION = 0.1
 
@@ -69,10 +69,10 @@ class JesterConfigFlow(ConfigFlow, domain=DOMAIN):
             if info:
                 await self.async_set_unique_id(user_input[CONF_TOKEN])
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title="Jester info", data=user_input)
+                return self.async_create_entry(title="Domika info", data=user_input)
 
         return self.async_show_form(
-            step_id="user", data_schema=JESTER_SCHEMA, errors=errors
+            step_id="user", data_schema=DOMIKA_SCHEMA, errors=errors
         )
 
 

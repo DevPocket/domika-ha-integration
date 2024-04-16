@@ -1,11 +1,11 @@
-"""Jester Constants."""
+"""Domika Constants."""
 from datetime import timedelta
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 import logging
 LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "jester"
+DOMAIN = "domika"
 UPDATE_INTERVAL = timedelta(minutes=15)
 
 SENSORS_DOMAIN = "binary_sensor"

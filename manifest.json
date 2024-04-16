@@ -1,6 +1,6 @@
 {
-  "domain": "jester",
-  "name": "Jester Integration",
+  "domain": "domika",
+  "name": "Domika Integration",
   "version": "0.1",
   "after_dependencies": ["http"],
   "codeowners": ["@bealex"],

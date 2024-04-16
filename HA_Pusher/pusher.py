@@ -405,7 +405,7 @@ class Pusher:
 
     def send_notification_ios(self, environment, token, data):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
-        r = requests.post('http://127.0.0.1:5000/send_notification_ios',
+        r = requests.post('https://domika.app/send_notification_ios',
                           json={"environment": environment, "token": token, "data": data})
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:

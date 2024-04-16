@@ -15,7 +15,7 @@ import json
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
-def json_encoder_jester(obj: Any) -> Any:
+def json_encoder_domika(obj: Any) -> Any:
     if hasattr(obj, "json_fragment"):
         return obj.json_fragment
     if isinstance(obj, (set, tuple)):

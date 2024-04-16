@@ -1,4 +1,4 @@
-"""The Jester integration."""
+"""The Domika integration."""
 from __future__ import annotations
 
 from homeassistant.helpers.typing import ConfigType
@@ -16,18 +16,17 @@ async def async_setup_entry(hass, config_entry):
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     def generate_push_notifications_ios(time):
         pusher = push.Pusher("")
-        pusher.init_ios_notifier("key.p8", hass.loop, True)
         pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
         pusher.close_connection()
-    # Set up the Jester WebSocket commands
-    websocket_api.async_register_command(hass, websocket_jester_update_push_token)
-    websocket_api.async_register_command(hass, websocket_jester_delete_push_token)
-    websocket_api.async_register_command(hass, websocket_jester_resubscribe)
-    websocket_api.async_register_command(hass, websocket_jester_resubscribe_push)
-    websocket_api.async_register_command(hass, websocket_jester_confirm_event)
-    websocket_api.async_register_command(hass, websocket_jester_critical_sensors)
+    # Set up the Domika WebSocket commands
+    websocket_api.async_register_command(hass, websocket_domika_update_push_token)
+    websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
+    websocket_api.async_register_command(hass, websocket_domika_resubscribe)
+    websocket_api.async_register_command(hass, websocket_domika_resubscribe_push)
+    websocket_api.async_register_command(hass, websocket_domika_confirm_event)
+    websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     event.async_track_time_interval(hass, generate_push_notifications_ios, UPDATE_INTERVAL, cancel_on_shutdown=True)
-    # Set up the Jester Event Listener
+    # Set up the Domika Event Listener
     hass.bus.async_listen("state_changed", forward_event)
     global HASS
     HASS = hass
@@ -39,8 +38,8 @@ def forward_event(event):
         for install_id in install_ids:
             dict_attributes = dict(attributes)
             dict_attributes["entity_id"] = entity_id
-            LOGGER.debug(f"""### jester_state_changed_{install_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
-            HASS.bus.async_fire(f"jester_state_changed_{install_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
+            LOGGER.debug(f"""### domika_state_changed_{install_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
+            HASS.bus.async_fire(f"domika_state_changed_{install_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
 
 
     if event.event_type == "state_changed":

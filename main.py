@@ -5,7 +5,7 @@ from HA_Pusher import confirm_events
 from HA_Pusher.const import *
 
 # ALEX_TOKEN = "12fad1ba8ee6ebded99279d3da37b672d85dcd6b2d9a48ca40f090243bdec2d5"
-BMIKLE_TOKEN = "a6b3cc48d19783a2063431c62bcd54029c6166163f3d8422acf3261f9ce3630c"
+BMIKLE_TOKEN = "df3d0b7a0becd4338494fd89126268fd491fa699318edea9cd44c96ef9aa3a7c"
 EVENT_CONFIRMER = confirm_events.EventConfirmer()
 
 TEST_DATA="""{"entity 1": {"att1": {"v:"value 1", "t": 12345},"att2": {"v:"value 2", "t": 54321}},"entity 2": {"some att": {"v:"some value", "t": 10000}}}"""

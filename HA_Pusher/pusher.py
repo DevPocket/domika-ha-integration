@@ -331,7 +331,7 @@ class Pusher:
                 DELETE FROM devices
                 WHERE julianday('now') - julianday(last_update) > ?
                 ;""", [DEVICE_EXPIRATION_TIME])
-        self.db.commit()
+            self.db.commit()
 
         push_logger.log_debug(f"add_event, entity_id={entity_id}, attributes={attributes}, context_id={context_id}, timestamp={timestamp}")
         # Remove all tokens which were marked as bad

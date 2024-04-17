@@ -9,3 +9,6 @@ IOS_SANDBOX_ENV = "sandbox"
 IOS_PRODUCTION_ENV = "production"
 
 ANDROID_PLATFORM = "android"
+
+# Number of days
+DEVICE_EXPIRATION_TIME = 15

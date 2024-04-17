@@ -245,11 +245,12 @@ class Pusher:
                         data.append((install_id, entity_id, att, 0))
 
                 try:
-                    self.cur.execute("DELETE FROM subscriptions WHERE install_id = ? ; ", [install_id])
+                    self.cur.execute("DELETE FROM subscriptions WHERE install_id = ? ;", [install_id])
                     self.cur.executemany("""
                         INSERT INTO subscriptions (install_id, entity_id, attribute, need_push) 
                         VALUES (?, ?, ?, ?)
                         ;""", data)
+                    self.cur.execute("UPDATE devices SET last_update = datetime('now') WHERE install_id = ? ;", [install_id])
                     self.db.commit()
                 except sqlite3.Error as er:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
@@ -325,9 +326,18 @@ class Pusher:
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
+        def remove_old_install_ids():
+            self.cur.execute("""
+                DELETE FROM devices
+                WHERE julianday('now') - julianday(last_update) > ?
+                ;""", [DEVICE_EXPIRATION_TIME])
+        self.db.commit()
+
         push_logger.log_debug(f"add_event, entity_id={entity_id}, attributes={attributes}, context_id={context_id}, timestamp={timestamp}")
         # Remove all tokens which were marked as bad
         remove_tokens_to_delete()
+        # Remove all install ids which did not update themselves for a long time
+        remove_old_install_ids()
 
         if not entity_id or not attributes or not timestamp:
             push_logger.log_error(f"add_event: one of the fields is empty, no record was updated: entity_id: {entity_id}, attributes: {attributes}, timestamp: {timestamp} ")

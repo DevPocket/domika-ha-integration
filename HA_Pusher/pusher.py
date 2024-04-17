@@ -1,6 +1,4 @@
 # Pusher
-from homeassistant.core import callback
-
 from . import push_logger
 from .confirm_events import *
 from .const import *
@@ -16,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 3
+CURRENT_DB_VERSION: int = 5
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -45,16 +43,17 @@ class Pusher:
                     DROP TABLE if exists subscriptions;
                     DROP TABLE if exists devices;
                     """)
-                self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
 
+            self.set_initial_db_version()
 
             self.cur.executescript("""
                 CREATE TABLE if not exists devices (
                     user_id TEXT NOT NULL, 
                     install_id TEXT PRIMARY KEY NOT NULL, 
-                    token TEXT UNIQUE NOT NULL, 
+                    token TEXT NOT NULL, 
                     platform TEXT NOT NULL, 
-                    environment TEXT NOT NULL
+                    environment TEXT NOT NULL,
+                    last_update TEXT NOT NULL DEFAULT (datetime('now'))
                     ); 
                     
                 CREATE TABLE if not exists subscriptions (
@@ -92,6 +91,11 @@ class Pusher:
                     """)
             self.update_db()
 
+    def set_initial_db_version(self):
+        res = self.cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='subscriptions';").fetchall()
+        if not len(res):
+            self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
+
 
     def update_db(self):
         def update_db_1_2():
@@ -104,6 +108,38 @@ class Pusher:
                 DROP TABLE if exists EVENTS.notifications
             """)
 
+        def update_db_3_4():
+            self.cur.executescript("""
+                PRAGMA legacy_alter_table = ON;
+                PRAGMA foreign_keys = OFF;
+                
+                BEGIN TRANSACTION;
+            
+                ALTER TABLE devices RENAME TO old_devices;
+                
+                CREATE TABLE devices (
+                    user_id TEXT NOT NULL, 
+                    install_id TEXT PRIMARY KEY NOT NULL, 
+                    token TEXT NOT NULL, 
+                    platform TEXT NOT NULL, 
+                    environment TEXT NOT NULL
+                    ); 
+                
+                INSERT INTO devices SELECT * FROM old_devices;
+                
+                PRAGMA foreign_keys = ON;
+                
+                DROP TABLE old_devices;
+
+                COMMIT;
+            """)
+
+        def update_db_4_5():
+            self.cur.executescript("""
+                ALTER TABLE devices
+                ADD COLUMN last_update TEXT DEFAULT (datetime('now'));
+            """)
+
         res = self.cur.execute("PRAGMA user_version")
         db_version = int(res.fetchone()[0]) or 1
         if db_version < CURRENT_DB_VERSION:
@@ -113,6 +149,10 @@ class Pusher:
                     update_db_1_2()
                 if db_version < 3:
                     update_db_2_3()
+                if db_version < 4:
+                    update_db_3_4()
+                if db_version < 5:
+                    update_db_4_5()
                 self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
@@ -126,8 +166,8 @@ class Pusher:
         def create_push_notification_token(self, user_id, token, platform, environment):
             push_logger.log_debug(f"create_push_notification_token, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
 
-            if not user_id or not token or not platform or not environment:
-                push_logger.log_error(f"create_push_notification_token: one of the fields is empty, no record was created: user_id: {user_id}, token: {token}, platform: {platform}, environment: {environment} ")
+            if not user_id or token is None or not platform or not environment:
+                push_logger.log_error(f"create_push_notification_token: one of the fields is empty, no record was created: user_id: {user_id}, platform: {platform}, environment: {environment} ")
             else:
                 success = False
                 new_install_id = str(uuid4())
@@ -141,8 +181,8 @@ class Pusher:
 
                 try:
                     self.cur.execute("""
-                        INSERT OR REPLACE INTO devices (user_id, install_id, token, platform, environment) 
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO devices (user_id, install_id, token, platform, environment, last_update) 
+                        VALUES (?, ?, ?, ?, ?, datetime('now'))
                         ;""", [user_id, new_install_id, token, platform, environment])
                     self.db.commit()
                     return new_install_id
@@ -151,8 +191,8 @@ class Pusher:
 
 
         push_logger.log_debug(f"update_push_notification_token, install_id={install_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
-        if not user_id or not token or not platform or not environment:
-            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id: {user_id}, token: {token}, platform: {platform}, environment: {environment} ")
+        if not user_id or token is None or not platform or not environment:
+            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id: {user_id}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
@@ -167,7 +207,8 @@ class Pusher:
                     if row[1] == user_id and row[3] == platform and row[4] == environment:
                         self.cur.execute("""
                             UPDATE devices
-                            SET token = ?
+                            SET token = ?,
+                                last_update = datetime('now')
                             WHERE install_id = ?
                             ;""", [token, install_id])
                         self.db.commit()
@@ -323,7 +364,8 @@ class Pusher:
                             e.attribute = s.attribute
                         JOIN devices d ON
                             s.install_id = d.install_id
-                    WHERE s.need_push = 1
+                    WHERE s.need_push = 1 AND 
+                          d.token != ''
                 ON CONFLICT(token, entity_id, attribute) DO UPDATE 
                     SET value = excluded.value,
                         timestamp = excluded.timestamp

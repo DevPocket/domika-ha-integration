@@ -14,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 5
+CURRENT_DB_VERSION: int = 2
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -34,128 +34,98 @@ class Pusher:
             self.cur.execute("ATTACH DATABASE ? as EVENTS", (database_path + EVENTS_DATABASE_NAME, ))
             self.cur.execute("PRAGMA foreign_keys = 1")
 
-            if recreate_db:
-                # The order is important because of the foreign key in subscriptions
-                self.cur.executescript("""
-                    DROP TABLE if exists EVENTS.notifications;
-                    DROP TABLE if exists EVENTS.push_data;
-                    DROP TABLE if exists EVENTS.events;
-                    DROP TABLE if exists subscriptions;
-                    DROP TABLE if exists devices;
-                    """)
-
-            self.set_initial_db_version()
-
-            self.cur.executescript("""
-                CREATE TABLE if not exists devices (
-                    user_id TEXT NOT NULL, 
-                    install_id TEXT PRIMARY KEY NOT NULL, 
-                    token TEXT NOT NULL, 
-                    platform TEXT NOT NULL, 
-                    environment TEXT NOT NULL,
-                    last_update TEXT NOT NULL DEFAULT (datetime('now'))
-                    ); 
-                    
-                CREATE TABLE if not exists subscriptions (
-                    install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
-                    entity_id TEXT NOT NULL,
-                    attribute TEXT NOT NULL,
-                    need_push INTEGER NOT NULL,
-                    UNIQUE(install_id, entity_id, attribute)
-                    ); 
-                    
-                CREATE TABLE if not exists EVENTS.events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    entity_id TEXT NOT NULL,
-                    attribute TEXT NOT NULL,
-                    value TEXT NOT NULL,
-                    context_id TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL,
-                    UNIQUE(entity_id, attribute)
-                    ); 
-                    
-                CREATE TABLE if not exists EVENTS.push_data (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    install_id TEXT NOT NULL,
-                    token TEXT NOT NULL, 
-                    platform TEXT NOT NULL, 
-                    environment TEXT NOT NULL,
-                    entity_id TEXT NOT NULL,
-                    attribute TEXT NOT NULL,
-                    value TEXT NOT NULL,
-                    context_id TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL,
-                    event_id INTEGER NOT NULL,
-                    UNIQUE(token, entity_id, attribute)
-                    ); 
-                    """)
+            self.create_db(recreate_db)
             self.update_db()
 
-    def set_initial_db_version(self):
-        res = self.cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='subscriptions';").fetchall()
-        if not len(res):
-            self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
+
+    def create_db(self, recreate_db):
+        if recreate_db:
+            # The order is important because of the foreign key in subscriptions
+            self.cur.executescript("""
+                DROP TABLE if exists EVENTS.notifications;
+                DROP TABLE if exists EVENTS.push_data;
+                DROP TABLE if exists EVENTS.events;
+                DROP TABLE if exists subscriptions;
+                DROP TABLE if exists devices;
+                DROP TABLE if exists db_version;
+                """)
+
+        self.cur.executescript("""
+            CREATE TABLE if not exists db_version (
+                version INTEGER NOT NULL DEFAULT (1) 
+                ); """)
+
+        # If new tables (nothing in db_version) — set version to the latest
+        if self.cur.execute("SELECT COUNT(*) FROM db_version").fetchone()[0] == 0:
+            self.update_db_version()
+
+        self.cur.executescript("""
+            CREATE TABLE if not exists devices (
+                user_id TEXT NOT NULL, 
+                install_id TEXT PRIMARY KEY NOT NULL, 
+                token TEXT NOT NULL, 
+                platform TEXT NOT NULL, 
+                environment TEXT NOT NULL,
+                last_update TEXT NOT NULL DEFAULT (datetime('now'))
+                ); 
+
+            CREATE TABLE if not exists subscriptions (
+                install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
+                entity_id TEXT NOT NULL,
+                attribute TEXT NOT NULL,
+                need_push INTEGER NOT NULL,
+                UNIQUE(install_id, entity_id, attribute)
+                ); 
+
+            CREATE TABLE if not exists EVENTS.events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                entity_id TEXT NOT NULL,
+                attribute TEXT NOT NULL,
+                value TEXT NOT NULL,
+                context_id TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                UNIQUE(entity_id, attribute)
+                ); 
+
+            CREATE TABLE if not exists EVENTS.push_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                install_id TEXT NOT NULL,
+                token TEXT NOT NULL, 
+                platform TEXT NOT NULL, 
+                environment TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                attribute TEXT NOT NULL,
+                value TEXT NOT NULL,
+                context_id TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                event_id INTEGER NOT NULL,
+                UNIQUE(token, entity_id, attribute)
+                ); 
+                """)
+
+
+    def update_db_version(self):
+        self.cur.execute("DELETE FROM db_version;")
+        self.cur.execute("INSERT INTO db_version (version) VALUES (?);", [CURRENT_DB_VERSION])
+        self.db.commit()
 
 
     def update_db(self):
         def update_db_1_2():
             self.cur.executescript("""
-                ALTER TABLE subscriptions
-                ADD COLUMN need_push INTEGER NOT NULL DEFAULT (0)
-            """)
-        def update_db_2_3():
-            self.cur.executescript("""
-                DROP TABLE if exists EVENTS.notifications
             """)
 
-        def update_db_3_4():
-            self.cur.executescript("""
-                PRAGMA legacy_alter_table = ON;
-                PRAGMA foreign_keys = OFF;
-                
-                BEGIN TRANSACTION;
-            
-                ALTER TABLE devices RENAME TO old_devices;
-                
-                CREATE TABLE devices (
-                    user_id TEXT NOT NULL, 
-                    install_id TEXT PRIMARY KEY NOT NULL, 
-                    token TEXT NOT NULL, 
-                    platform TEXT NOT NULL, 
-                    environment TEXT NOT NULL
-                    ); 
-                
-                INSERT INTO devices SELECT * FROM old_devices;
-                
-                PRAGMA foreign_keys = ON;
-                
-                DROP TABLE old_devices;
-
-                COMMIT;
-            """)
-
-        def update_db_4_5():
-            self.cur.executescript("""
-                ALTER TABLE devices
-                ADD COLUMN last_update TEXT DEFAULT (datetime('now'));
-            """)
-
-        res = self.cur.execute("PRAGMA user_version")
+        res = self.cur.execute("SELECT MAX(version) FROM db_version;")
         db_version = int(res.fetchone()[0]) or 1
         if db_version < CURRENT_DB_VERSION:
-            push_logger.log_debug(f"user_version: {db_version}, CURRENT_DB_VERSION: {CURRENT_DB_VERSION}")
-            try:
-                if db_version < 2:
-                    update_db_1_2()
-                if db_version < 3:
-                    update_db_2_3()
-                if db_version < 4:
-                    update_db_3_4()
-                if db_version < 5:
-                    update_db_4_5()
-                self.cur.execute(f"PRAGMA user_version = {CURRENT_DB_VERSION}")
-            except sqlite3.Error as er:
-                push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
+            push_logger.log_debug(f"recreating DB: user_version {db_version}, CURRENT_DB_VERSION {CURRENT_DB_VERSION}")
+            self.create_db(True)
+            # try:
+            #     if db_version < 2:
+            #         update_db_1_2()
+            #     self.update_db_version()
+            # except sqlite3.Error as er:
+            #     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
     def close_connection(self):

@@ -66,7 +66,7 @@ class Pusher:
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
-                last_update TEXT NOT NULL DEFAULT (datetime('now'))
+                last_update TEXT NOT NULL DEFAULT ('2099-01-01 01:23:45')
                 ); 
 
             CREATE TABLE if not exists subscriptions (
@@ -296,18 +296,9 @@ class Pusher:
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
-        def remove_old_install_ids():
-            self.cur.execute("""
-                DELETE FROM devices
-                WHERE julianday('now') - julianday(last_update) > ?
-                ;""", [DEVICE_EXPIRATION_TIME])
-            self.db.commit()
-
         push_logger.log_debug(f"add_event, entity_id={entity_id}, attributes={attributes}, context_id={context_id}, timestamp={timestamp}")
         # Remove all tokens which were marked as bad
         remove_tokens_to_delete()
-        # Remove all install ids which did not update themselves for a long time
-        remove_old_install_ids()
 
         if not entity_id or not attributes or not timestamp:
             push_logger.log_error(f"add_event: one of the fields is empty, no record was updated: entity_id: {entity_id}, attributes: {attributes}, timestamp: {timestamp} ")
@@ -357,11 +348,20 @@ class Pusher:
         except sqlite3.Error as er:
             push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
+    def remove_old_install_ids(self):
+        self.cur.execute("""
+            DELETE FROM devices
+            WHERE julianday('now') - julianday(last_update) > ?
+            ;""", [DEVICE_EXPIRATION_TIME])
+        self.db.commit()
 
     def generate_push_notifications_ios(self, event_confirmer: EventConfirmer):
         push_logger.log_debug(f"generate_push_notifications_ios, event_confirmer={event_confirmer}")
         with LOCK_ALL:
             try:
+                # Remove all install ids which did not update themselves for a long time
+                self.remove_old_install_ids()
+
                 db_res = self.cur.execute("""
                     SELECT id, token, environment, entity_id, attribute, value, install_id, context_id, timestamp
                     FROM EVENTS.push_data

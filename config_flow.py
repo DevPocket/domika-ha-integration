@@ -9,14 +9,9 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.const import CONF_TOKEN
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import (
-    DOMAIN,
-    LOGGER
-)
+from .const import *
 
 DOMIKA_SCHEMA = vol.Schema(
     {
@@ -29,20 +24,18 @@ class DomikaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 0.1
 
+    # async def async_step_user(
+    #         self, user_input: dict[str, str] | None = None
+    # ) -> FlowResult:
+    #     """Handle the initial step."""
+    #     errors: dict[str, str] = {}
+    #     return self.async_create_entry(title="Domika info", data={})
+
+
     async def async_step_user(
-            self, user_input: dict[str, str] | None = None
+        self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
-        errors: dict[str, str] = {}
-        return self.async_create_entry(title="Domika info", data={})
+        """Handle a flow initialized by the user."""
+        return self.async_create_entry(title=DEFAULT_NAME, data={})
 
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
-
-
-class UnknownAuth(HomeAssistantError):
-    """Error to indicate there is an uncaught auth error."""
+    # return self.async_show_form(step_id="user")

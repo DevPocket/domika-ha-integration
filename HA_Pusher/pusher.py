@@ -14,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 2
+CURRENT_DB_VERSION: int = 3
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -27,11 +27,10 @@ class Pusher:
     def __init__(self, database_path="", recreate_db=False):
         with LOCK_ALL:
             # Connect to db, if it does not exist — create one
-            self.db = sqlite3.connect(database_path + SUBSCRIPTIONS_DATABASE_NAME)
+            self.db = sqlite3.connect(database_path)
             self.db.row_factory = sqlite3.Row
             self.cur = self.db.cursor()
 
-            self.cur.execute("ATTACH DATABASE ? as EVENTS", (database_path + EVENTS_DATABASE_NAME, ))
             self.cur.execute("PRAGMA foreign_keys = 1")
 
             self.create_db(recreate_db)
@@ -42,9 +41,8 @@ class Pusher:
         if recreate_db:
             # The order is important because of the foreign key in subscriptions
             self.cur.executescript("""
-                DROP TABLE if exists EVENTS.notifications;
-                DROP TABLE if exists EVENTS.push_data;
-                DROP TABLE if exists EVENTS.events;
+                DROP TABLE if exists push_data;
+                DROP TABLE if exists events;
                 DROP TABLE if exists subscriptions;
                 DROP TABLE if exists devices;
                 DROP TABLE if exists db_version;
@@ -77,8 +75,7 @@ class Pusher:
                 UNIQUE(install_id, entity_id, attribute)
                 ); 
 
-            CREATE TABLE if not exists EVENTS.events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            CREATE TABLE if not exists events (
                 entity_id TEXT NOT NULL,
                 attribute TEXT NOT NULL,
                 value TEXT NOT NULL,
@@ -87,8 +84,7 @@ class Pusher:
                 UNIQUE(entity_id, attribute)
                 ); 
 
-            CREATE TABLE if not exists EVENTS.push_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            CREATE TABLE if not exists push_data (
                 install_id TEXT NOT NULL,
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
@@ -98,7 +94,6 @@ class Pusher:
                 value TEXT NOT NULL,
                 context_id TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
-                event_id INTEGER NOT NULL,
                 UNIQUE(token, entity_id, attribute)
                 ); 
                 """)
@@ -327,7 +322,7 @@ class Pusher:
         push_logger.log_debug(f"process_events")
         try:
             self.cur.execute("""
-                INSERT INTO EVENTS.push_data (install_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp, event_id) 
+                INSERT INTO push_data (install_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
                     SELECT d.install_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp, e.id 
                     FROM events e
                         JOIN subscriptions s ON
@@ -363,25 +358,17 @@ class Pusher:
                 self.remove_old_install_ids()
 
                 db_res = self.cur.execute("""
-                    SELECT id, token, environment, entity_id, attribute, value, install_id, context_id, timestamp
-                    FROM EVENTS.push_data
+                    SELECT token, environment, entity_id, attribute, value, install_id, context_id, timestamp
+                    FROM push_data
                     WHERE platform = ?
                     ORDER BY token, entity_id
                     ;""", [IOS_PLATFORM])
                 res = list(db_res.fetchall())
                 self.cur.execute("""
-                    DELETE FROM EVENTS.push_data 
+                    DELETE FROM push_data 
                     WHERE platform = ?
                     ;""", [IOS_PLATFORM])
                 self.db.commit()
-
-                #             "entity 1": {
-                #                 "att1": {"v:"value 1", "t": 12345},
-                #                 "att2": {"v:"value 2", "t": 54321}
-                #             },
-                #             "entity 2": {
-                #                 "some att": {"v:"some value", "t": 10000},
-                #             }
 
                 data = ""
                 current_token = None

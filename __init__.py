@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import event
 from .websocket_commands import *
 from .functions import *
@@ -9,7 +10,8 @@ from .functions import *
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 HASS: HomeAssistant
 
-async def async_setup_entry(hass, config_entry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up from a config entry."""
     return True
 
 
@@ -18,6 +20,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         pusher = push.Pusher("")
         pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
         pusher.close_connection()
+
     # Set up the Domika WebSocket commands
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
     websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
@@ -30,6 +33,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.bus.async_listen("state_changed", forward_event)
     global HASS
     HASS = hass
+
     return True
 
 
@@ -44,8 +48,11 @@ def forward_event(event):
 
     if event.event_type == "state_changed":
         LOGGER.debug(f">>> Got event for entity: {event.data['entity_id']}")
-        old_attributes = event_data_to_set(event.data["old_state"]) or {}
-        new_attributes = event_data_to_set(event.data["new_state"]) or {}
+        LOGGER.debug(f"### Test: {HASS.data[DOMAIN]}")
+        # Make a flat dict from state data.
+        old_attributes = event_data_to_dict(event.data["old_state"]) or {}
+        new_attributes = event_data_to_dict(event.data["new_state"]) or {}
+        # Calculate the changed attributes by subtracting old_state elements from new_state.
         attributes = set(new_attributes.items()) - set(old_attributes.items())
         entity_id = event.data['entity_id'] or ""
         # LOGGER.debug(f"""### EVENT
@@ -57,7 +64,6 @@ def forward_event(event):
         #     """)
 
         if attributes:
-            pusher = push.Pusher("")
             if entity_id.startswith("binary_sensor."):
                 # Get device_class for this binary sensor.
                 sensor = HASS.states.get(entity_id)
@@ -71,6 +77,7 @@ def forward_event(event):
 
             # Check if any install_ids are subscribed for these attributes.
             # If so, fire the event to those install_ids for app to catch.
+            pusher = push.Pusher("")
             install_ids = pusher.install_ids_for_event(entity_id, attributes)
             LOGGER.debug(f"install_ids_for_event: {install_ids}")
             if install_ids:

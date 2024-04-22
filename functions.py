@@ -40,7 +40,7 @@ def make_dictionary(value, prefix, flat_result):
             flat_result[prefix] = f'{value}'
 
 
-def event_data_to_set(event_data):
+def event_data_to_dict(event_data):
     if event_data is not None:
         flat = {}
         jason_b = js.json_bytes(event_data.as_compressed_state)

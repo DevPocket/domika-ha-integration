@@ -5,7 +5,9 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 import logging
 LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "domika"
+DOMAIN = "Domika"
+DEFAULT_NAME = "Domika"
+
 UPDATE_INTERVAL = timedelta(minutes=15)
 
 SENSORS_DOMAIN = "binary_sensor"

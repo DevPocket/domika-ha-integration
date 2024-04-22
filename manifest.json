@@ -1,5 +1,5 @@
 {
-  "domain": "domika",
+  "domain": "Domika",
   "name": "Domika Integration",
   "version": "0.1",
   "after_dependencies": ["http"],

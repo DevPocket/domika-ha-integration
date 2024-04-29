@@ -73,7 +73,8 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
                 LOGGER.error(f"DomikaAPIDomainServicesView requesting state of unknown entity: {entity_id}")
 
         data = json.dumps({ "entities": res_list })
-        response.body = f"""{ "entities": {data} }"""
+        LOGGER.debug(f"DomikaAPIDomainServicesView data: {data}")
+        response.body = data
         return response
 
 

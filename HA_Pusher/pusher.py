@@ -27,7 +27,7 @@ class Pusher:
     def __init__(self, database_path="", recreate_db=False):
         with LOCK_ALL:
             # Connect to db, if it does not exist — create one
-            self.db = sqlite3.connect(database_path)
+            self.db = sqlite3.connect(database_path + EVENTS_DATABASE_NAME)
             self.db.row_factory = sqlite3.Row
             self.cur = self.db.cursor()
 

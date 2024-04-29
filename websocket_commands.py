@@ -86,8 +86,8 @@ def websocket_domika_resubscribe(
     LOGGER.debug(f'Got websocket message "resubscribe", data: {msg}')
     install_id = msg.get("install_id")
 
+    res_list = []
     if install_id:
-        res_list = []
         for entity_id in msg.get("subscriptions"):
             state = hass.states.get(entity_id)
             if state:

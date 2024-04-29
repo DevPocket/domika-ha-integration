@@ -48,7 +48,6 @@ def forward_event(event):
 
     if event.event_type == "state_changed":
         LOGGER.debug(f">>> Got event for entity: {event.data['entity_id']}")
-        LOGGER.debug(f"### Test: {HASS.data[DOMAIN]}")
         # Make a flat dict from state data.
         old_attributes = event_data_to_dict(event.data["old_state"]) or {}
         new_attributes = event_data_to_dict(event.data["new_state"]) or {}

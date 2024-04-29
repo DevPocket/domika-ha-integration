@@ -1,6 +1,8 @@
 """The Domika integration."""
 from __future__ import annotations
 
+from aiohttp import web
+from homeassistant.components.api import APIDomainServicesView
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import event
@@ -21,6 +23,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
         pusher.close_connection()
 
+    hass.http.register_view(DomikaAPIDomainServicesView)
+
     # Set up the Domika WebSocket commands
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
     websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
@@ -35,6 +39,20 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     HASS = hass
 
     return True
+
+class DomikaAPIDomainServicesView(APIDomainServicesView):
+    """View to handle Status requests."""
+
+    url = "/domika/services/{domain}/{service}"
+    name = "domika:domain-services"
+
+    async def post(
+        self, request: web.Request, domain: str, service: str
+    ) -> web.Response:
+        """Retrieve if API is running."""
+        response = await super().post(request, domain, service)
+        response.body = """{ "state": "neudachnik" }"""
+        return response
 
 
 def forward_event(event):

@@ -323,7 +323,7 @@ class Pusher:
         try:
             self.cur.execute("""
                 INSERT INTO push_data (install_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
-                    SELECT d.install_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp, e.id 
+                    SELECT d.install_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
                     FROM events e
                         JOIN subscriptions s ON
                             e.entity_id = s.entity_id AND
@@ -412,9 +412,13 @@ class Pusher:
         # No matter what — remove expired.
         event_confirmer.remove_expired()
 
-    def send_notification_ios(self, environment, token, data):
+    def send_notification_ios(self, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
-        r = requests.post('https://domika.app/send_notification_ios',
+        if not local:
+            r = requests.post('https://domika.app/send_notification_ios',
+                          json={"environment": environment, "token": token, "data": data})
+        else:
+            r = requests.post('http://127.0.0.1:5000/send_notification_ios',
                           json={"environment": environment, "token": token, "data": data})
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:

@@ -8,20 +8,20 @@ from HA_Pusher.const import *
 BMIKLE_TOKEN = "df3d0b7a0becd4338494fd89126268fd491fa699318edea9cd44c96ef9aa3a7c"
 EVENT_CONFIRMER = confirm_events.EventConfirmer()
 
-TEST_DATA="""{"entity 1": {"att1": {"v:"value 1", "t": 12345},"att2": {"v:"value 2", "t": 54321}},"entity 2": {"some att": {"v:"some value", "t": 10000}}}"""
+TEST_DATA="""{"entity 1": {"att1": {"v":"value 1", "t": 12345},"att2": {"v":"value 2", "t": 54321}},"entity 2": {"some att": {"v":"some value", "t": 10000}}}"""
 
 if __name__ == '__main__':
     pusher = push.Pusher("", True)
-    # pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA)
-    bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
-    pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y"]})
-    pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["Y"]})
-    # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
-
-    pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
-    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
-    EVENT_CONFIRMER.add_confirmation(bmikle_id,"cont2")
-    pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
-    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA, True)
+    # bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
+    # pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y"]})
+    # pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["Y"]})
+    # # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
+    #
+    # pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
+    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    # EVENT_CONFIRMER.add_confirmation(bmikle_id,"cont2")
+    # pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
+    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
 
     # print(EVENT_CONFIRMER)

@@ -49,7 +49,7 @@ def event_data_to_dict(event_data):
         make_dictionary(dictionary, "", flat)
         return flat
 
-def get_critical_sensors(hass):
+def get_critical_sensors(hass) -> dict:
     entity_ids = hass.states.async_entity_ids(SENSORS_DOMAIN)
     entity_registry = er.async_get(hass)
     sensors_list = []

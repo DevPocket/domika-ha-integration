@@ -30,9 +30,7 @@ class Pusher:
             self.db = sqlite3.connect(database_path + EVENTS_DATABASE_NAME)
             self.db.row_factory = sqlite3.Row
             self.cur = self.db.cursor()
-
             self.cur.execute("PRAGMA foreign_keys = 1")
-
             self.create_db(recreate_db)
             self.update_db()
 
@@ -402,8 +400,7 @@ class Pusher:
                         current_entity_id = row["entity_id"]
 
                     # Add current attribute to data
-                    # data += f'"{row["attribute"]}":"{row["value"]}",'
-                    data += f""""{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},"""
+                    data += f'"{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},'
                 if len(data) > 0:
                     self.send_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
             except sqlite3.Error as er:
@@ -415,11 +412,11 @@ class Pusher:
     def send_notification_ios(self, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
         if not local:
-            r = requests.post('https://domika.app/send_notification_ios',
-                          json={"environment": environment, "token": token, "data": data})
+            r = requests.post('https://domika.app/send_notification',
+                          json={"environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
         else:
-            r = requests.post('http://127.0.0.1:5000/send_notification_ios',
-                          json={"environment": environment, "token": token, "data": data})
+            r = requests.post('http://127.0.0.1:5000/send_notification',
+                          json={"environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:
             TOKENS_TO_DELETE.add(token)

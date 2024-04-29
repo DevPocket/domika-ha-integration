@@ -86,32 +86,28 @@ def websocket_domika_resubscribe(
     LOGGER.debug(f'Got websocket message "resubscribe", data: {msg}')
     install_id = msg.get("install_id")
 
-    connection.send_result(
-        msg.get("id"), {}
-    )
-
     if install_id:
+        res_list = []
         for entity_id in msg.get("subscriptions"):
             state = hass.states.get(entity_id)
             if state:
+                dict_attributes = {}
                 state_bytes = orjson.dumps(state.as_compressed_state, default=json_encoder_domika, option=orjson.OPT_NON_STR_KEYS)
                 compressed_state = orjson.loads(state_bytes)
                 # LOGGER.debug(f"### state: {compressed_state}")
-                dict_attributes = {}
                 make_dictionary(compressed_state, "", dict_attributes)
                 [dict_attributes.pop(k, None) for k in ["c", "lc", "lu"]]
                 dict_attributes["entity_id"] = entity_id
                 time_updated = max(state.last_changed, state.last_updated)
-                # LOGGER.debug(f"""### websocket_domika_resubscribe {install_id}, {dict_attributes}, {EventOrigin.local}, {state.context}, {time_updated} """)
-                hass.bus.async_fire(
-                    f"domika_state_changed_{install_id}",
-                    dict_attributes,
-                    EventOrigin.local,
-                    state.context,
-                    time_updated.timestamp()
-                )
+                res_list.append({"entity_id": entity_id, "time_updated": time_updated, "attributes": dict_attributes})
             else:
                 LOGGER.error(f"websocket_domika_resubscribe requesting state of unknown entity: {entity_id}")
+
+    # LOGGER.debug(f"### websocket_domika_resubscribe: {install_id}, {res_list} ")
+
+    connection.send_result(
+        msg.get("id"), {"entities": res_list}
+    )
 
     pusher = push.Pusher("")
     pusher.resubscribe(

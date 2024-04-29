@@ -97,7 +97,6 @@ def websocket_domika_resubscribe(
                 # LOGGER.debug(f"### state: {compressed_state}")
                 make_dictionary(compressed_state, "", dict_attributes)
                 [dict_attributes.pop(k, None) for k in ["c", "lc", "lu"]]
-                dict_attributes["entity_id"] = entity_id
                 time_updated = max(state.last_changed, state.last_updated)
                 res_list.append({"entity_id": entity_id, "time_updated": time_updated, "attributes": dict_attributes})
             else:

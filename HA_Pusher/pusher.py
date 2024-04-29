@@ -271,6 +271,37 @@ class Pusher:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
+    # Fetches the list of entites and their attributes this install_id is subscribed to (only those with need_push = 1)
+    def push_attributes_for_install_id(self, install_id: str) -> list:
+        push_logger.log_debug(f"push_attributes_for_install_id, install_id={install_id}")
+        with LOCK_ALL:
+            entities_list = []
+            if not install_id:
+                push_logger.log_error(f"push_attributes_for_install_id: install_id cannot be empty ")
+            else:
+                db_res = self.cur.execute(f"""
+                    SELECT entity_id, attribute
+                    FROM subscriptions s
+                    WHERE install_id = ? AND
+                          need_push = 1
+                    ORDER BY entity_id
+                    ;""", [install_id])
+
+                last_entity_id = None
+                entity_attributes = []
+                for row in db_res.fetchall():
+                    entity_id = row["entity_id"]
+                    if entity_id != last_entity_id:
+                        if entity_attributes:
+                            entities_list.append({"entity_id": last_entity_id, "attributes": entity_attributes})
+                        entity_attributes = []
+                        last_entity_id = entity_id
+                    entity_attributes.append(row["attribute"])
+                if entity_attributes:
+                    entities_list.append({"entity_id": last_entity_id, "attributes": entity_attributes})
+            return entities_list
+
+
     def add_event(self, entity_id, attributes, context_id, timestamp):
         def remove_tokens_to_delete():
             global TOKENS_TO_DELETE

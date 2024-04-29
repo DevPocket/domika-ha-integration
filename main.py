@@ -13,9 +13,10 @@ TEST_DATA="""{"entity 1": {"att1": {"v":"value 1", "t": 12345},"att2": {"v":"val
 if __name__ == '__main__':
     pusher = push.Pusher("", False)
     pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA, True)
-    # bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
-    # pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y"]})
-    # pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["Y"]})
+    bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, "ios", "sandbox")
+    pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y", "Z"]})
+    pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["X", "Y"]})
+    print(pusher.push_attributes_for_install_id(bmikle_id))
     # # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
     #
     # pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)

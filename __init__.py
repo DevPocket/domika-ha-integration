@@ -1,11 +1,17 @@
 """The Domika integration."""
 from __future__ import annotations
 
+import asyncio
+from http import HTTPStatus
+
 from aiohttp import web
 from homeassistant.components.api import APIDomainServicesView
+from homeassistant.const import CONTENT_TYPE_JSON
+from homeassistant.helpers.json import json_bytes
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import event
+
 from .websocket_commands import *
 from .functions import *
 
@@ -40,6 +46,29 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     return True
 
+
+def get_states_for_system_widgets(push_attributes: list):
+    res_list = []
+    for entity_data in push_attributes:
+        entity_id = entity_data["entity_id"]
+        attributes_list = entity_data["attributes"]
+        state = HASS.states.get(entity_id)
+        if state:
+            dict_attributes = {}
+            state_bytes = orjson.dumps(
+                state.as_compressed_state,
+                default=json_encoder_domika,
+                option=orjson.OPT_NON_STR_KEYS)
+            compressed_state = orjson.loads(state_bytes)
+            make_dictionary(compressed_state, "", dict_attributes)
+            filtered_dict = {k: v for (k, v) in dict_attributes.items() if k in attributes_list}
+            time_updated = max(state.last_changed, state.last_updated).timestamp()
+            res_list.append({"entity_id": entity_id, "time_updated": time_updated, "attributes": filtered_dict})
+        else:
+            LOGGER.error(f"get_states_for_system_widgets is requesting state of unknown entity: {entity_id}")
+    return res_list
+
+
 class DomikaAPIDomainServicesView(APIDomainServicesView):
     """View to handle Status requests."""
 
@@ -55,24 +84,12 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
 
         install_id = request.headers.get("X-Install-Id")
         LOGGER.debug(f"install_id: {install_id}")
+
+        await asyncio.sleep(0.5)
+
         pusher = push.Pusher("")
         push_attributes = pusher.push_attributes_for_install_id(install_id)
-
-        res_list = []
-        for entity_data in push_attributes:
-            entity_id = entity_data["entity_id"]
-            attributes_list = entity_data["attributes"]
-            state = HASS.states.get(entity_id)
-            if state:
-                dict_attributes = {}
-                state_bytes = orjson.dumps(state.as_compressed_state, default=json_encoder_domika, option=orjson.OPT_NON_STR_KEYS)
-                compressed_state = orjson.loads(state_bytes)
-                make_dictionary(compressed_state, "", dict_attributes)
-                filtered_dict = {k: v for (k, v) in dict_attributes.items() if k in attributes_list}
-                time_updated = max(state.last_changed, state.last_updated).timestamp()
-                res_list.append({"entity_id": entity_id, "time_updated": time_updated, "attributes": filtered_dict})
-            else:
-                LOGGER.error(f"DomikaAPIDomainServicesView requesting state of unknown entity: {entity_id}")
+        res_list = get_states_for_system_widgets(push_attributes)
 
         LOGGER.debug(f"entities data: {res_list}")
         data = json.dumps({ "entities": res_list })
@@ -80,6 +97,40 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         response.body = data
         return response
 
+
+"""
+class DomikaAPIPushStatesWithDelay(APIDomainServicesView):
+
+    url = "/domika1/services/{domain}/{service}"
+    name = "domika1:domain-services"
+
+    async def post(
+        self, request: web.Request, domain: str, service: str
+    ) -> web.Response:
+        LOGGER.debug(f"DomikaAPIPushStatesWithDelay")
+
+        install_id = request.headers.get("X-Install-Id")
+        LOGGER.debug(f"install_id: {install_id}")
+
+        await asyncio.sleep(5)
+
+        pusher = push.Pusher("")
+        push_attributes = pusher.push_attributes_for_install_id(install_id)
+        res_list = get_states_for_system_widgets(push_attributes)
+
+        LOGGER.debug(f"entities data: {res_list}")
+        data = json.dumps({ "entities": res_list })
+        LOGGER.debug(f"DomikaAPIPushStatesWithDelay data: {data}")
+
+        response = web.Response(
+            body=json_bytes(data),
+            content_type=CONTENT_TYPE_JSON,
+            status=int(HTTPStatus.OK),
+            headers=None,
+            zlib_executor_size=32768,
+        )
+        return response
+"""
 
 def forward_event(event):
     def fire_events_to_install_ids(install_ids: list):

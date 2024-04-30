@@ -16,6 +16,31 @@ EVENT_CONFIRMER: confirm_events.EventConfirmer = confirm_events.EventConfirmer()
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "domika/update_install_id",
+        vol.Optional("install_id"): str,
+    }
+)
+@callback
+def websocket_domika_update_install_id(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "update_install_id", data: {msg}')
+    pusher = push.Pusher("")
+    install_id = pusher.update_install_id(
+        msg.get("install_id"),
+        connection.user.id,
+    )
+    connection.send_result(
+        msg.get("id"), {"install_id": install_id}
+    )
+    pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "domika/update_push_token",
         vol.Optional("install_id"): str,
         vol.Required("push_token_hex"): str,
@@ -32,17 +57,28 @@ def websocket_domika_update_push_token(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_push_token", data: {msg}')
     pusher = push.Pusher("")
-    install_id = pusher.update_push_notification_token(
-        msg.get("install_id"),
+    install_id = msg.get("install_id")
+    # This method involves http request. We need to assume it may take quite some time.
+    # Do we need to make it async with callback somehow?
+    res = pusher.update_push_notification_token(
+        install_id,
         connection.user.id,
         msg.get("push_token_hex"),
         msg.get("platform"),
         msg.get("environment")
     )
     connection.send_result(
-        msg.get("id"), {"install_id": install_id}
+        msg.get("id"), {"result": res}
     )
     pusher.close_connection()
+
+    if res == 1:
+        dict_attributes = {"push_activation_success": True}
+    else:
+        dict_attributes = {"push_activation_success": False}
+    LOGGER.debug(
+        f"""### domika_state_changed_{install_id}, {dict_attributes} """)
+    hass.bus.async_fire(f"domika_state_changed_{install_id}", dict_attributes)
 
 
 @websocket_api.websocket_command(
@@ -60,7 +96,7 @@ def websocket_domika_delete_push_token(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "delete_push_token", data: {msg}')
     pusher = push.Pusher("")
-    pusher.remove_push_notification_token(
+    pusher.remove_install_id(
         msg.get("install_id")
     )
     connection.send_result(

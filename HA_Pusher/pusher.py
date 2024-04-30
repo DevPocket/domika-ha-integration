@@ -125,18 +125,41 @@ class Pusher:
         self.db.close()
 
 
-    def update_push_notification_token(self, install_id, user_id, token, platform, environment) -> str:
-        def create_push_notification_token(self, user_id, token, platform, environment):
-            push_logger.log_debug(f"create_push_notification_token, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
+    def update_install_id(self, install_id, user_id) -> str:
+        push_logger.log_debug(f"update_install_id, install_id={install_id}, user_id={user_id}")
+        if not user_id:
+            push_logger.log_error(f"update_install_id: user_id can not be empty")
+            return ""
+        else:
+            with LOCK_ALL:
+                # Try to find the proper record. If no install_id found or user_id is a mismatch — generate a new one.
+                res = self.cur.execute("""
+                    SELECT install_id, user_id
+                    FROM devices
+                    WHERE install_id = ?
+                    ;""", [install_id])
 
-            if not user_id or token is None or not platform or not environment:
-                push_logger.log_error(f"create_push_notification_token: one of the fields is empty, no record was created: user_id: {user_id}, platform: {platform}, environment: {environment} ")
-            else:
+                data = res.fetchall()
+                if len(data) == 1:
+                    row = data[0]
+                    if row[1] == user_id:
+                        # Found a proper record. Update last_update field.
+                        self.cur.execute("""
+                            UPDATE devices
+                            SET last_update = datetime('now')
+                            WHERE install_id = ?
+                            ;""", [install_id])
+                        self.db.commit()
+                        return install_id
+                    else:
+                        # If a mismatch — remove old record.
+                        self.remove_install_id(install_id)
+
+                # If we didn't find the right install_id we need to generate one
                 success = False
                 new_install_id = str(uuid4())
-
                 while not success:
-                    res = self.cur.execute("""SELECT count(*) FROM devices WHERE install_id = ? """, [new_install_id])
+                    res = self.cur.execute("""SELECT count(*) FROM devices WHERE install_id = ? """,[new_install_id])
                     if res.fetchone()[0] == 0:
                         success = True
                     else:
@@ -145,54 +168,63 @@ class Pusher:
                 try:
                     self.cur.execute("""
                         INSERT INTO devices (user_id, install_id, token, platform, environment, last_update) 
-                        VALUES (?, ?, ?, ?, ?, datetime('now'))
-                        ;""", [user_id, new_install_id, token, platform, environment])
+                        VALUES (?, ?, "", "", "", datetime('now'))
+                        ;""", [user_id, new_install_id])
                     self.db.commit()
                     return new_install_id
                 except sqlite3.Error as er:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
-
+    # Returns 1 if success
+    # Returns 0 if install_id exists, but token can't be activated
+    # Returns -1 if install_id does not exist for this user_id
+    def update_push_notification_token(self, install_id, user_id, token, platform, environment) -> int:
         push_logger.log_debug(f"update_push_notification_token, install_id={install_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or token is None or not platform or not environment:
-            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id: {user_id}, platform: {platform}, environment: {environment} ")
+            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
-                    SELECT install_id, user_id, token, platform, environment
+                    SELECT install_id
                     FROM devices
-                    WHERE install_id = ?
-                    ;""", [install_id])
+                    WHERE install_id = ? AND
+                          user_id = ?
+                    ;""", [install_id, user_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
-                    row = data[0]
-                    if row[1] == user_id and row[3] == platform and row[4] == environment:
+                    # We don't store the api_ket in DB yet, so I am sending "123" as a filler
+                    r = requests.post('https://domika.app/check_api_key',
+                                      json={"environment": environment, "token": token, "api_key": "123",
+                                            "platform": IOS_PLATFORM})
+                    push_logger.log_debug(f"check_api_key result: {r.text}, {r.status_code}")
+                    if r.text == "1":
+                        # We don't want to store token in the integration in the future,
+                        # it's a temp solution until we have a working push server
                         self.cur.execute("""
                             UPDATE devices
                             SET token = ?,
+                                platform = ?,
+                                environment = ?,
                                 last_update = datetime('now')
                             WHERE install_id = ?
-                            ;""", [token, install_id])
+                            ;""", [token, platform, environment, install_id])
                         self.db.commit()
-                        return install_id
+                        return 1
                     else:
-                        # push_logger.log_debug(f"update_push_notification_token, parameters sent differ from DB, recreating device record")
-                        self.remove_push_notification_token(install_id)
-                        return create_push_notification_token(self, user_id, token, platform, environment)
+                        return 0
                 else:
-                    # push_logger.log_debug(f"update_push_notification_token, device not found, creating device record")
-                    return create_push_notification_token(self, user_id, token, platform, environment)
+                    # Wrong install id
+                    return -1
 
 
-    def remove_push_notification_token(self, install_id):
-        push_logger.log_debug(f"remove_push_notification_token, install_id={install_id}")
-        with LOCK_ALL:
-            if not install_id:
-                push_logger.log_error(f"remove_push_notification_token: install_id is empty, no record was removed: install_id: {install_id} ")
-            else:
-                self.cur.execute("DELETE FROM devices WHERE install_id = ?;", [install_id])
-                self.db.commit()
+    def remove_install_id(self, install_id):
+        push_logger.log_debug(f"remove_install_id, install_id={install_id}")
+        if not install_id:
+            push_logger.log_error(f"remove_install_id: install_id is empty, no record was removed: install_id: {install_id} ")
+        else:
+            self.cur.execute("DELETE FROM devices WHERE install_id = ?;", [install_id])
+            self.db.commit()
 
 
     def resubscribe(self, install_id, subscriptions):

@@ -72,7 +72,7 @@ class TestPusher(TestCase):
         res = pusher.cur.execute("SELECT count(*) FROM devices WHERE user_id = ?;", ["user 1"])
         self.assertEqual(res.fetchone()[0], 2)
         # Remove token 1_2
-        pusher.remove_push_notification_token(id1_2)
+        pusher.remove_install_id(id1_2)
         # Check that record deleted
         res = pusher.cur.execute("SELECT count(*) FROM devices WHERE user_id = ?;", ["user 1"])
         self.assertEqual(res.fetchone()[0], 1)
@@ -127,7 +127,7 @@ class TestPusher(TestCase):
         self.assertEqual(res.fetchone()[0], 3)
 
         # Remove install_id record
-        pusher.remove_push_notification_token(id1_1)
+        pusher.remove_install_id(id1_1)
         # Check records
         res = pusher.cur.execute("SELECT count(*) FROM subscriptions;")
         self.assertEqual(res.fetchone()[0], 0)

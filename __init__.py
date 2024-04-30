@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from http import HTTPStatus
 
 from aiohttp import web
-from homeassistant.components.api import APIDomainServicesView
+from homeassistant.components.api import APIDomainServicesView, APIServicesView
 from homeassistant.const import CONTENT_TYPE_JSON
-from homeassistant.helpers.json import json_bytes
+from homeassistant.helpers.http import HomeAssistantView
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import event
@@ -30,6 +31,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         pusher.close_connection()
 
     hass.http.register_view(DomikaAPIDomainServicesView)
+    hass.http.register_view(DomikaAPIPushStatesWithDelay)
 
     # Set up the Domika WebSocket commands
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
@@ -98,39 +100,50 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         return response
 
 
-"""
-class DomikaAPIPushStatesWithDelay(APIDomainServicesView):
+class DomikaAPIPushStatesWithDelay(HomeAssistantView):
 
-    url = "/domika1/services/{domain}/{service}"
-    name = "domika1:domain-services"
+    url = "/domika/push_states_with_delay"
+    name = "domika:push-states-with-delay"
 
     async def post(
-        self, request: web.Request, domain: str, service: str
+        self, request: web.Request
     ) -> web.Response:
         LOGGER.debug(f"DomikaAPIPushStatesWithDelay")
 
-        install_id = request.headers.get("X-Install-Id")
+        request_dict = await request.json()
+        # request_dict = dict(json.loads(request_json))
+        LOGGER.debug(f"request_dict: {request_dict}")
+
+        # install_id = request.headers.get("X-Install-Id")
+        install_id = request_dict.get("install_id")
         LOGGER.debug(f"install_id: {install_id}")
 
-        await asyncio.sleep(5)
+        if install_id:
+            await asyncio.sleep(5)
 
-        pusher = push.Pusher("")
-        push_attributes = pusher.push_attributes_for_install_id(install_id)
-        res_list = get_states_for_system_widgets(push_attributes)
+            pusher = push.Pusher("")
+            push_attributes = pusher.push_attributes_for_install_id(install_id)
+            res_list = get_states_for_system_widgets(push_attributes)
 
-        LOGGER.debug(f"entities data: {res_list}")
-        data = json.dumps({ "entities": res_list })
-        LOGGER.debug(f"DomikaAPIPushStatesWithDelay data: {data}")
+            LOGGER.debug(f"entities data: {res_list}")
+            data = json.dumps({ "entities": res_list })
+            LOGGER.debug(f"DomikaAPIPushStatesWithDelay data: {data}")
 
-        response = web.Response(
-            body=json_bytes(data),
-            content_type=CONTENT_TYPE_JSON,
-            status=int(HTTPStatus.OK),
-            headers=None,
-            zlib_executor_size=32768,
-        )
-        return response
-"""
+            return web.Response(
+                body=data,
+                content_type=CONTENT_TYPE_JSON,
+                status=int(HTTPStatus.OK),
+                headers=None,
+                zlib_executor_size=32768,
+            )
+        else:
+            return web.Response(
+                body={"error": "no install_id"},
+                content_type=CONTENT_TYPE_JSON,
+                status=int(HTTPStatus.BAD_REQUEST),
+                headers=None,
+                zlib_executor_size=32768,
+            )
 
 def forward_event(event):
     def fire_events_to_install_ids(install_ids: list):

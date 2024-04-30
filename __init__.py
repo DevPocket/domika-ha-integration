@@ -53,7 +53,7 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         LOGGER.debug(f"DomikaAPIDomainServicesView")
         response = await super().post(request, domain, service)
 
-        install_id = request.headers.get("install_id")
+        install_id = request.headers.get("X-Install-Id")
         LOGGER.debug(f"install_id: {install_id}")
         pusher = push.Pusher("")
         push_attributes = pusher.push_attributes_for_install_id(install_id)

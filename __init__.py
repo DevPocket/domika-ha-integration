@@ -50,9 +50,11 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         self, request: web.Request, domain: str, service: str
     ) -> web.Response:
         """Retrieve if API is running."""
+        LOGGER.debug(f"DomikaAPIDomainServicesView")
         response = await super().post(request, domain, service)
 
-        install_id = request.get("install_id")
+        install_id = request.headers.get("install_id")
+        LOGGER.debug(f"install_id: {install_id}")
         pusher = push.Pusher("")
         push_attributes = pusher.push_attributes_for_install_id(install_id)
 
@@ -67,11 +69,12 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
                 compressed_state = orjson.loads(state_bytes)
                 make_dictionary(compressed_state, "", dict_attributes)
                 filtered_dict = {k: v for (k, v) in dict_attributes.items() if k in attributes_list}
-                time_updated = max(state.last_changed, state.last_updated)
+                time_updated = max(state.last_changed, state.last_updated).timestamp()
                 res_list.append({"entity_id": entity_id, "time_updated": time_updated, "attributes": filtered_dict})
             else:
                 LOGGER.error(f"DomikaAPIDomainServicesView requesting state of unknown entity: {entity_id}")
 
+        LOGGER.debug(f"entities data: {res_list}")
         data = json.dumps({ "entities": res_list })
         LOGGER.debug(f"DomikaAPIDomainServicesView data: {data}")
         response.body = data

@@ -9,6 +9,7 @@ import orjson
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback, EventOrigin
 from .functions import *
+import requests
 
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 EVENT_CONFIRMER: confirm_events.EventConfirmer = confirm_events.EventConfirmer()
@@ -72,11 +73,16 @@ def websocket_domika_update_push_token(
 
     if res == 1:
         dict_attributes = {"push_activation_success": True}
-    else:
+    elif res == 2:
+        dict_attributes = None
+    elif res == 0:
         dict_attributes = {"push_activation_success": False}
-    LOGGER.debug(
-        f"""### domika_state_changed_{app_session_id}, {dict_attributes} """)
-    hass.bus.async_fire(f"domika_state_changed_{app_session_id}", dict_attributes)
+    elif res == -1:
+        dict_attributes = {"invalid_app_session_id": True}
+
+    if dict_attributes:
+        LOGGER.debug(f"""### domika_state_changed_{app_session_id}, {dict_attributes} """)
+        hass.bus.async_fire(f"domika_state_changed_{app_session_id}", dict_attributes)
 
 
 @websocket_api.websocket_command(
@@ -101,6 +107,111 @@ def websocket_domika_delete_push_token(
         msg.get("id"), {}
     )
     pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/update_push_session",
+        vol.Required("original_transaction_id"): str,
+        vol.Required("token"): str,
+        vol.Required("platform"): str,
+        vol.Required("environment"): str,
+    }
+)
+@callback
+def websocket_domika_update_push_session(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "update_push_session", data: {msg}')
+
+    original_transaction_id = msg.get("original_transaction_id")
+    token = msg.get("token")
+    platform = msg.get("platform")
+    environment = msg.get("environment")
+
+    if original_transaction_id and token and platform and environment:
+        r = requests.post('https://domika.app/update_push_session',
+                          json={"original_transaction_id": original_transaction_id, "token": token, "platform": platform, "environment": environment})
+        LOGGER.log_debug(f"update_push_session result: {r.text}, {r.status_code}")
+
+        connection.send_result(
+            msg.get("id"), {"result": 1, "text": "ok"}
+        )
+    else:
+        connection.send_result(
+            msg.get("id"), {"result": 0, "text": "one of the parameters is missing"}
+        )
+
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/verify_push_session",
+        vol.Required("app_session_id"): str,
+        vol.Required("verification_key"): str,
+    }
+)
+@callback
+def websocket_domika_verify_push_session(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "verify_push_session", data: {msg}')
+    app_session_id = msg.get("app_session_id")
+    verification_key = msg.get("verification_key")
+
+    if app_session_id and verification_key:
+        pusher = push.Pusher("")
+        old_push_session_id = pusher.get_push_session(app_session_id)
+        r = requests.post('https://domika.app/verify_push_session',
+                          json={"verification_key": verification_key, "old_push_session_id": old_push_session_id})
+        LOGGER.log_debug(f"verify_push_session result: {r.text}, {r.status_code}")
+        push_session_id = r.text
+        if push_session_id:
+            pusher.save_push_session(app_session_id, push_session_id)
+            connection.send_result( msg.get("id"), {"result": 1, "text": "ok"} )
+        else:
+            connection.send_result( msg.get("id"), {"result": 0, "text": "verification failed"} )
+        pusher.close_connection()
+    else:
+        connection.send_result( msg.get("id"), {"result": 0, "text": "one of the parameters is missing"} )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/remove_push_session",
+        vol.Required("app_session_id"): str,
+    }
+)
+@callback
+def websocket_domika_remove_push_session(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "remove_push_session", data: {msg}')
+    app_session_id = msg.get("app_session_id")
+
+    if app_session_id:
+        pusher = push.Pusher("")
+        push_session_id = pusher.get_push_session(app_session_id)
+        pusher.save_push_session(app_session_id, "")
+        pusher.close_connection()
+        if push_session_id:
+            r = requests.post('https://domika.app/remove_push_session',
+                              json={"push_session_id": push_session_id})
+            LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
+            connection.send_result( msg.get("id"), {"result": 1, "text": "ok"} )
+        else:
+            connection.send_result(msg.get("id"), {"result": 0, "text": f"push_session_id not found for app_session_id: {app_session_id}"})
+    else:
+        connection.send_result( msg.get("id"), {"result": 0, "text": "missing app_session_id"} )
 
 
 @websocket_api.websocket_command(

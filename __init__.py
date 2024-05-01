@@ -37,6 +37,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_domika_update_app_session_id)
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
     websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
+    websocket_api.async_register_command(hass, websocket_domika_update_push_session)
+    websocket_api.async_register_command(hass, websocket_domika_verify_push_session)
+    websocket_api.async_register_command(hass, websocket_domika_remove_push_session)
     websocket_api.async_register_command(hass, websocket_domika_resubscribe)
     websocket_api.async_register_command(hass, websocket_domika_resubscribe_push)
     websocket_api.async_register_command(hass, websocket_domika_confirm_event)
@@ -115,15 +118,14 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         LOGGER.debug(f"DomikaAPIPushStatesWithDelay")
 
         request_dict = await request.json()
-        # request_dict = dict(json.loads(request_json))
         LOGGER.debug(f"request_dict: {request_dict}")
 
-        # app_session_id = request.headers.get("X-App-Session-Id")
         app_session_id = request_dict.get("app_session_id")
+        delay = int(request_dict.get("delay"))
         LOGGER.debug(f"app_session_id: {app_session_id}")
 
         if app_session_id:
-            await asyncio.sleep(5)
+            await asyncio.sleep(delay)
 
             pusher = push.Pusher("")
             push_attributes = pusher.push_attributes_for_app_session_id(app_session_id)

@@ -14,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 6
+CURRENT_DB_VERSION: int = 9
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
@@ -49,7 +49,7 @@ class Pusher:
 
         self.cur.executescript("""
             CREATE TABLE if not exists db_version (
-                version INTEGER NOT NULL DEFAULT (1) 
+                version INTEGER NOT NULL DEFAULT 1 
                 ); """)
 
         # If new tables (nothing in db_version) — set version to the latest
@@ -64,10 +64,11 @@ class Pusher:
 
             CREATE TABLE if not exists devices (
                 app_session_id TEXT PRIMARY KEY NOT NULL, 
+                push_session_id TEXT NOT NULL DEFAULT "", 
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
-                last_update TEXT NOT NULL DEFAULT ('2099-01-01 01:23:45')
+                last_update TEXT NOT NULL DEFAULT '2099-01-01 01:23:45'
                 ); 
 
             CREATE TABLE if not exists subscriptions (
@@ -89,6 +90,7 @@ class Pusher:
 
             CREATE TABLE if not exists push_data (
                 app_session_id TEXT NOT NULL,
+                push_session_id TEXT NOT NULL,
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
@@ -173,8 +175,9 @@ class Pusher:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
+    # Returns 2 if app_session_id exists, push_session_id exists and confirmed on the server, but the token is different
     # Returns 1 if success
-    # Returns 0 if app_session_id exists, but token can't be activated
+    # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
     # Returns -1 if app_session_id does not exist
     def update_push_notification_token(self, app_session_id, token, platform, environment) -> int:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, token={token}, platform={platform}, environment={environment}")
@@ -183,31 +186,36 @@ class Pusher:
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
-                    SELECT app_session_id
+                    SELECT app_session_id, push_session_id 
                     FROM devices
                     WHERE app_session_id = ?
                     ;""", [app_session_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
-                    # We don't store the api_key in DB yet, so I am sending "123" as a filler
-                    r = requests.post('https://domika.app/check_api_key',
-                                      json={"environment": environment, "token": token, "api_key": "123",
-                                            "platform": IOS_PLATFORM})
-                    push_logger.log_debug(f"check_api_key result: {r.text}, {r.status_code}")
-                    if r.text == "1":
-                        # We don't want to store token in the integration in the future,
-                        # it's a temp solution until we have a working push server
-                        self.cur.execute("""
-                            UPDATE devices
-                            SET token = ?,
-                                platform = ?,
-                                environment = ?,
-                                last_update = datetime('now')
-                            WHERE app_session_id = ?
-                            ;""", [token, platform, environment, app_session_id])
-                        self.db.commit()
-                        return 1
+                    push_session_id = data[0][1]
+                    if push_session_id:
+                        r = requests.post('https://domika.app/check_push_session',
+                                          json={"environment": environment, "token": token, "push_session_id": push_session_id,
+                                                "platform": IOS_PLATFORM})
+                        push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
+                        if r.text == "1":
+                            # We don't want to store token in the integration in the future,
+                            # it's a temp solution until we have a working push server
+                            self.cur.execute("""
+                                UPDATE devices
+                                SET token = ?,
+                                    platform = ?,
+                                    environment = ?,
+                                    last_update = datetime('now')
+                                WHERE app_session_id = ?
+                                ;""", [token, platform, environment, app_session_id])
+                            self.db.commit()
+                            return 1
+                        elif r.text == "2":
+                            return 2
+                        else:
+                            return 0
                     else:
                         return 0
                 else:
@@ -222,6 +230,38 @@ class Pusher:
         else:
             self.cur.execute("DELETE FROM devices WHERE app_session_id = ?;", [app_session_id])
             self.db.commit()
+
+
+    def save_push_session(self, app_session_id, push_session_id):
+        push_logger.log_debug(f"save_push_session, app_session_id={app_session_id}, push_session_id={push_session_id}")
+        with LOCK_ALL:
+            if not app_session_id:
+                push_logger.log_error(f"save_push_session: one of the fields is empty, no record was updated: app_session_id: {app_session_id} ")
+            else:
+                self.cur.execute("""
+                    UPDATE devices 
+                    SET push_session_id = ?
+                    WHERE app_session_id = ?
+                    ;""", [push_session_id, app_session_id])
+                self.db.commit()
+
+
+    def get_push_session(self, app_session_id):
+        push_logger.log_debug(f"get_push_session, app_session_id={app_session_id} ")
+        with LOCK_ALL:
+            if not app_session_id:
+                push_logger.log_error(f"get_push_session: one of the fields is empty, no record was updated: app_session_id: {app_session_id} ")
+            else:
+                db_res = self.cur.execute("""
+                    SELECT push_session_id 
+                    FROM devices 
+                    WHERE app_session_id = ?
+                    ;""", [app_session_id])
+                res = list(db_res.fetchall())
+                if len(res) == 1:
+                    return res[0][0]
+                else:
+                    return ""
 
 
     def resubscribe(self, app_session_id, subscriptions):
@@ -380,8 +420,8 @@ class Pusher:
         push_logger.log_debug(f"process_events")
         try:
             self.cur.execute("""
-                INSERT INTO push_data (app_session_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
-                    SELECT d.app_session_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
+                INSERT INTO push_data (app_session_id, push_session_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
+                    SELECT d.app_session_id, d.push_session_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
                     FROM events e
                         JOIN subscriptions s ON
                             e.entity_id = s.entity_id AND
@@ -389,7 +429,8 @@ class Pusher:
                         JOIN devices d ON
                             s.app_session_id = d.app_session_id
                     WHERE s.need_push = 1 AND 
-                          d.token != ''
+                          d.token != '' AND
+                          d.push_session_id != ''
                 ON CONFLICT(token, entity_id, attribute) DO UPDATE 
                     SET value = excluded.value,
                         timestamp = excluded.timestamp
@@ -416,7 +457,7 @@ class Pusher:
                 self.remove_old_app_session_ids()
 
                 db_res = self.cur.execute("""
-                    SELECT token, environment, entity_id, attribute, value, app_session_id, context_id, timestamp
+                    SELECT token, environment, entity_id, attribute, value, app_session_id, push_session_id, context_id, timestamp
                     FROM push_data
                     WHERE platform = ?
                     ORDER BY token, entity_id
@@ -431,6 +472,7 @@ class Pusher:
                 data = ""
                 current_token = None
                 current_environment = None
+                current_push_session_id = None
                 current_entity_id = None
                 for row in res:
                     # If already confirmed — skip
@@ -441,13 +483,15 @@ class Pusher:
                     if current_token is None:
                         current_token = row["token"]
                         current_environment = row["environment"]
+                        current_push_session_id = row["push_session_id"]
 
                     # New token or too long — send push with data
                     if current_token != row["token"] or len(data) > 2000:
-                        self.send_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
+                        self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
                         data = ""
                         current_token = row["token"]
                         current_environment = row["environment"]
+                        current_push_session_id = row["push_session_id"]
                         current_entity_id = None
 
                     # New entity_id — add its name
@@ -462,42 +506,52 @@ class Pusher:
                     # Add current attribute to data
                     data += f'"{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},'
                 if len(data) > 0:
-                    self.send_notification_ios(current_environment, current_token, "{" + data[:-1] + "}}")
+                    self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
         # No matter what — remove expired.
         event_confirmer.remove_expired()
 
-    def send_notification_ios(self, environment, token, data, local=False):
+    def send_notification_ios(self, push_session_id, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
         if not local:
             r = requests.post('https://domika.app/send_notification',
-                          json={"environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
+                          json={"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
         else:
             r = requests.post('http://127.0.0.1:5000/send_notification',
-                          json={"environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
+                          json={"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:
             TOKENS_TO_DELETE.add(token)
 
+
     def save_dashboards(self, user_id: str, dashboards: str):
-        self.cur.execute("""
-            INSERT INTO dashboards (user_id, dashboards) 
-            VALUES (?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                dashboards = excluded.dashboards
-            ;""", [user_id, dashboards])
-        self.db.commit()
+        with LOCK_ALL:
+            if not user_id or not dashboards:
+                push_logger.log_error(f"save_dashboards: one of the fields is empty, no record was updated: user_id: {user_id}, dashboards={dashboards} ")
+            else:
+                self.cur.execute("""
+                    INSERT INTO dashboards (user_id, dashboards) 
+                    VALUES (?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        dashboards = excluded.dashboards
+                    ;""", [user_id, dashboards])
+                self.db.commit()
 
     def get_dashboards(self, user_id: str) -> str:
-        db_res = self.cur.execute("""
-            SELECT dashboards 
-            FROM dashboards 
-            WHERE user_id = ?
-            ;""", [user_id])
-        res = list(db_res.fetchall())
-        if res:
-            return res[0][0]
-        else:
-            return ""
+        with LOCK_ALL:
+            if not user_id:
+                push_logger.log_error(f"get_dashboards: one of the fields is empty, no record was updated: user_id: {user_id} ")
+            else:
+                db_res = self.cur.execute("""
+                    SELECT dashboards 
+                    FROM dashboards 
+                    WHERE user_id = ?
+                    ;""", [user_id])
+                res = list(db_res.fetchall())
+                if len(res) == 1:
+                    return res[0][0]
+                else:
+                    return ""
+

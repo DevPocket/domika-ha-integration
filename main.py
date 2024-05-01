@@ -45,7 +45,7 @@ def test_events(pusher: push.Pusher):
 
 
 if __name__ == '__main__':
-    pusher = push.Pusher("", False)
+    pusher = push.Pusher("", True)
     test_dashboards(pusher)
     test_init(pusher)
     test_events(pusher)

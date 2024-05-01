@@ -14,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 5
+CURRENT_DB_VERSION: int = 6
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
@@ -63,7 +63,6 @@ class Pusher:
                 ); 
 
             CREATE TABLE if not exists devices (
-                user_id TEXT NOT NULL, 
                 app_session_id TEXT PRIMARY KEY NOT NULL, 
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
@@ -131,36 +130,28 @@ class Pusher:
         self.db.close()
 
 
-    def update_app_session_id(self, app_session_id, user_id) -> str:
-        push_logger.log_debug(f"update_app_session_id, app_session_id={app_session_id}, user_id={user_id}")
-        if not user_id:
-            push_logger.log_error(f"update_app_session_id: user_id can not be empty")
-            return ""
-        else:
-            with LOCK_ALL:
-                # Try to find the proper record. If no app_session_id found or user_id is a mismatch — generate a new one.
-                res = self.cur.execute("""
-                    SELECT app_session_id, user_id
-                    FROM devices
+    def update_app_session_id(self, app_session_id) -> str:
+        push_logger.log_debug(f"update_app_session_id, app_session_id={app_session_id}")
+        with LOCK_ALL:
+            # Try to find the proper record. If no app_session_id found — generate a new one.
+            res = self.cur.execute("""
+                SELECT app_session_id
+                FROM devices
+                WHERE app_session_id = ?
+                ;""", [app_session_id])
+
+            data = res.fetchall()
+            if len(data) == 1:
+                # Found a proper record. Update last_update field.
+                row = data[0]
+                self.cur.execute("""
+                    UPDATE devices
+                    SET last_update = datetime('now')
                     WHERE app_session_id = ?
                     ;""", [app_session_id])
-
-                data = res.fetchall()
-                if len(data) == 1:
-                    row = data[0]
-                    if row[1] == user_id:
-                        # Found a proper record. Update last_update field.
-                        self.cur.execute("""
-                            UPDATE devices
-                            SET last_update = datetime('now')
-                            WHERE app_session_id = ?
-                            ;""", [app_session_id])
-                        self.db.commit()
-                        return app_session_id
-                    else:
-                        # If a mismatch — remove old record.
-                        self.remove_app_session_id(app_session_id)
-
+                self.db.commit()
+                return app_session_id
+            else:
                 # If we didn't find the right app_session_id we need to generate one
                 success = False
                 new_app_session_id = str(uuid4())
@@ -173,33 +164,33 @@ class Pusher:
 
                 try:
                     self.cur.execute("""
-                        INSERT INTO devices (user_id, app_session_id, token, platform, environment, last_update) 
-                        VALUES (?, ?, "", "", "", datetime('now'))
-                        ;""", [user_id, new_app_session_id])
+                        INSERT INTO devices (app_session_id, token, platform, environment, last_update) 
+                        VALUES (?, "", "", "", datetime('now'))
+                        ;""", [new_app_session_id])
                     self.db.commit()
                     return new_app_session_id
                 except sqlite3.Error as er:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
+
     # Returns 1 if success
     # Returns 0 if app_session_id exists, but token can't be activated
-    # Returns -1 if app_session_id does not exist for this user_id
-    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
-        push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
-        if not user_id or token is None or not platform or not environment:
-            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
+    # Returns -1 if app_session_id does not exist
+    def update_push_notification_token(self, app_session_id, token, platform, environment) -> int:
+        push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, token={token}, platform={platform}, environment={environment}")
+        if token is None or not platform or not environment:
+            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: token={token}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
                     SELECT app_session_id
                     FROM devices
-                    WHERE app_session_id = ? AND
-                          user_id = ?
-                    ;""", [app_session_id, user_id])
+                    WHERE app_session_id = ?
+                    ;""", [app_session_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
-                    # We don't store the api_ket in DB yet, so I am sending "123" as a filler
+                    # We don't store the api_key in DB yet, so I am sending "123" as a filler
                     r = requests.post('https://domika.app/check_api_key',
                                       json={"environment": environment, "token": token, "api_key": "123",
                                             "platform": IOS_PLATFORM})
@@ -220,7 +211,7 @@ class Pusher:
                     else:
                         return 0
                 else:
-                    # Wrong install id
+                    # Wrong app_session_id
                     return -1
 
 

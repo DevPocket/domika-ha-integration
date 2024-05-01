@@ -30,8 +30,7 @@ def websocket_domika_update_app_session_id(
     LOGGER.debug(f'Got websocket message "update_app_session_id", data: {msg}')
     pusher = push.Pusher("")
     app_session_id = pusher.update_app_session_id(
-        msg.get("app_session_id"),
-        connection.user.id,
+        msg.get("app_session_id")
     )
     connection.send_result(
         msg.get("id"), {"app_session_id": app_session_id}
@@ -62,7 +61,6 @@ def websocket_domika_update_push_token(
     # Do we need to make it async with callback somehow?
     res = pusher.update_push_notification_token(
         app_session_id,
-        connection.user.id,
         msg.get("push_token_hex"),
         msg.get("platform"),
         msg.get("environment")

@@ -21,15 +21,15 @@ def test_send_notification_ios(pusher: push.Pusher):
     pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA, True)
 
 def test_init(pusher: push.Pusher):
-    bmikle_id = pusher.update_app_session_id("94673325-0591-4485-aa2e-aa64e7a473d3", "bmikle")
+    bmikle_id = pusher.update_app_session_id("94673325-0591-4485-aa2e-aa64e7a473d3")
     print(bmikle_id)
-    bmikle_id = pusher.update_push_notification_token(bmikle_id, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
+    bmikle_id = pusher.update_push_notification_token(bmikle_id, BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
     print(bmikle_id)
-    bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
+    bmikle_id = pusher.update_push_notification_token(None, BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
     print(bmikle_id)
 
 def test_events(pusher: push.Pusher):
-    bmikle_id = pusher.update_app_session_id(None, "bmikle")
+    bmikle_id = pusher.update_app_session_id(None)
     pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y", "Z"]})
     pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["X", "Y"]})
     print(pusher.push_attributes_for_app_session_id(bmikle_id))
@@ -47,6 +47,6 @@ def test_events(pusher: push.Pusher):
 if __name__ == '__main__':
     pusher = push.Pusher("", False)
     test_dashboards(pusher)
-    # test_init(pusher)
-    # test_events(pusher)
+    test_init(pusher)
+    test_events(pusher)
 

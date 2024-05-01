@@ -34,9 +34,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(DomikaAPIPushStatesWithDelay)
 
     # Set up the Domika WebSocket commands
-    websocket_api.async_register_command(hass, websocket_domika_update_app_session_id)
+    websocket_api.async_register_command(hass, websocket_domika_update_app_session)
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
-    websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
+    websocket_api.async_register_command(hass, websocket_domika_remove_app_session)
     websocket_api.async_register_command(hass, websocket_domika_update_push_session)
     websocket_api.async_register_command(hass, websocket_domika_verify_push_session)
     websocket_api.async_register_command(hass, websocket_domika_remove_push_session)

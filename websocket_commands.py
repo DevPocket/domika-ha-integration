@@ -17,7 +17,7 @@ EVENT_CONFIRMER: confirm_events.EventConfirmer = confirm_events.EventConfirmer()
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "domika/update_app_session_id",
+        vol.Required("type"): "domika/update_app_session",
         vol.Optional("app_session_id"): str,
     }
 )
@@ -28,7 +28,7 @@ def websocket_domika_update_app_session_id(
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
-    LOGGER.debug(f'Got websocket message "update_app_session_id", data: {msg}')
+    LOGGER.debug(f'Got websocket message "update_app_session", data: {msg}')
     pusher = push.Pusher("")
     app_session_id = pusher.update_app_session_id(
         msg.get("app_session_id")
@@ -87,7 +87,7 @@ def websocket_domika_update_push_token(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "domika/delete_push_token",
+        vol.Required("type"): "domika/remove_app_session",
         vol.Required("app_session_id"): str,
     }
 )
@@ -98,7 +98,7 @@ def websocket_domika_delete_push_token(
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
-    LOGGER.debug(f'Got websocket message "delete_push_token", data: {msg}')
+    LOGGER.debug(f'Got websocket message "remove_app_session", data: {msg}')
     pusher = push.Pusher("")
     pusher.remove_app_session_id(
         msg.get("app_session_id")

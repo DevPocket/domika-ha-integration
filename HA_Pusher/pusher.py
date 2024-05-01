@@ -178,7 +178,7 @@ class Pusher:
     # Returns -1 if app_session_id does not exist
     def update_push_notification_token(self, app_session_id, token, platform, environment) -> int:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, token={token}, platform={platform}, environment={environment}")
-        if token is None or not platform or not environment:
+        if not token or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: token={token}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:

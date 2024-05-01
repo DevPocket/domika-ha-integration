@@ -34,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(DomikaAPIPushStatesWithDelay)
 
     # Set up the Domika WebSocket commands
-    websocket_api.async_register_command(hass, websocket_domika_update_install_id)
+    websocket_api.async_register_command(hass, websocket_domika_update_app_session_id)
     websocket_api.async_register_command(hass, websocket_domika_update_push_token)
     websocket_api.async_register_command(hass, websocket_domika_delete_push_token)
     websocket_api.async_register_command(hass, websocket_domika_resubscribe)
@@ -88,13 +88,13 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         LOGGER.debug(f"DomikaAPIDomainServicesView")
         response = await super().post(request, domain, service)
 
-        install_id = request.headers.get("X-Install-Id")
-        LOGGER.debug(f"install_id: {install_id}")
+        app_session_id = request.headers.get("X-App-Session-Id")
+        LOGGER.debug(f"app_session_id: {app_session_id}")
 
         await asyncio.sleep(0.5)
 
         pusher = push.Pusher("")
-        push_attributes = pusher.push_attributes_for_install_id(install_id)
+        push_attributes = pusher.push_attributes_for_app_session_id(app_session_id)
         res_list = get_states_for_system_widgets(push_attributes)
 
         LOGGER.debug(f"entities data: {res_list}")
@@ -118,15 +118,15 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         # request_dict = dict(json.loads(request_json))
         LOGGER.debug(f"request_dict: {request_dict}")
 
-        # install_id = request.headers.get("X-Install-Id")
-        install_id = request_dict.get("install_id")
-        LOGGER.debug(f"install_id: {install_id}")
+        # app_session_id = request.headers.get("X-App-Session-Id")
+        app_session_id = request_dict.get("app_session_id")
+        LOGGER.debug(f"app_session_id: {app_session_id}")
 
-        if install_id:
+        if app_session_id:
             await asyncio.sleep(5)
 
             pusher = push.Pusher("")
-            push_attributes = pusher.push_attributes_for_install_id(install_id)
+            push_attributes = pusher.push_attributes_for_app_session_id(app_session_id)
             res_list = get_states_for_system_widgets(push_attributes)
 
             LOGGER.debug(f"entities data: {res_list}")
@@ -142,7 +142,7 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             )
         else:
             return web.Response(
-                body={"error": "no install_id"},
+                body={"error": "no app_session_id"},
                 content_type=CONTENT_TYPE_JSON,
                 status=int(HTTPStatus.BAD_REQUEST),
                 headers=None,
@@ -150,12 +150,12 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             )
 
 def forward_event(event):
-    def fire_events_to_install_ids(install_ids: list):
-        for install_id in install_ids:
+    def fire_events_to_app_session_ids(app_session_ids: list):
+        for app_session_id in app_session_ids:
             dict_attributes = dict(attributes)
             dict_attributes["entity_id"] = entity_id
-            LOGGER.debug(f"""### domika_state_changed_{install_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
-            HASS.bus.async_fire(f"domika_state_changed_{install_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
+            LOGGER.debug(f"""### domika_state_changed_{app_session_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
+            HASS.bus.async_fire(f"domika_state_changed_{app_session_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
 
 
     if event.event_type == "state_changed":
@@ -186,13 +186,13 @@ def forward_event(event):
                     # Fire the event for app to catch.
                     HASS.bus.async_fire("critical_sensors_changed", sensors_data, event.origin, event.context, event.time_fired.timestamp())
 
-            # Check if any install_ids are subscribed for these attributes.
-            # If so, fire the event to those install_ids for app to catch.
+            # Check if any app_session_ids are subscribed for these attributes.
+            # If so, fire the event to those app_session_ids for app to catch.
             pusher = push.Pusher("")
-            install_ids = pusher.install_ids_for_event(entity_id, attributes)
-            LOGGER.debug(f"install_ids_for_event: {install_ids}")
-            if install_ids:
-                fire_events_to_install_ids(install_ids)
+            app_session_ids = pusher.app_session_ids_for_event(entity_id, attributes)
+            LOGGER.debug(f"app_session_ids_for_event: {app_session_ids}")
+            if app_session_ids:
+                fire_events_to_app_session_ids(app_session_ids)
 
             # Record event in Pusher db.
             pusher.add_event(entity_id, attributes, event.context.id, event.time_fired.timestamp() * 1e6)

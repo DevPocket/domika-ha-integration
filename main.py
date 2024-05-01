@@ -17,24 +17,36 @@ def test_dashboards(pusher: push.Pusher):
     print(f'user1: {pusher.get_dashboards("user1")}')
     print(f'user2: {pusher.get_dashboards("user2")}')
 
+def test_send_notification_ios(pusher: push.Pusher):
+    pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA, True)
+
+def test_init(pusher: push.Pusher):
+    bmikle_id = pusher.update_app_session_id("94673325-0591-4485-aa2e-aa64e7a473d3", "bmikle")
+    print(bmikle_id)
+    bmikle_id = pusher.update_push_notification_token(bmikle_id, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
+    print(bmikle_id)
+    bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
+    print(bmikle_id)
+
+def test_events(pusher: push.Pusher):
+    bmikle_id = pusher.update_app_session_id(None, "bmikle")
+    pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y", "Z"]})
+    pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["X", "Y"]})
+    print(pusher.push_attributes_for_app_session_id(bmikle_id))
+    print(pusher.app_session_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
+
+    pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
+    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    EVENT_CONFIRMER.add_confirmation(bmikle_id,"cont2")
+    pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
+    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    print(EVENT_CONFIRMER)
+
+
 
 if __name__ == '__main__':
     pusher = push.Pusher("", False)
     test_dashboards(pusher)
-    # pusher.send_notification_ios(IOS_SANDBOX_ENV, BMIKLE_TOKEN, TEST_DATA, True)
-    # bmikle_id = pusher.update_install_id("94673325-0591-4485-aa2e-aa64e7a473d3", "bmikle")
-    # print(bmikle_id)
-    # print(pusher.update_push_notification_token(bmikle_id, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV))
-    # bmikle_id = pusher.update_push_notification_token(None, "bmikle", BMIKLE_TOKEN, IOS_PLATFORM, IOS_SANDBOX_ENV)
-    # pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y", "Z"]})
-    # pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["X", "Y"]})
-    # print(pusher.push_attributes_for_install_id(bmikle_id))
-    # # print(pusher.install_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
-    #
-    # pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
-    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
-    # EVENT_CONFIRMER.add_confirmation(bmikle_id,"cont2")
-    # pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
-    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
+    # test_init(pusher)
+    # test_events(pusher)
 
-    # print(EVENT_CONFIRMER)

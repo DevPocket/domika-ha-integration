@@ -52,7 +52,7 @@ class TestPusher(TestCase):
         pusher.update_push_notification_token(id1_2, "token 1-2 and UPDATE")
 
         # Check that the token updated exists
-        res = pusher.cur.execute("SELECT token FROM devices WHERE install_id = ?;", [id1_2])
+        res = pusher.cur.execute("SELECT token FROM devices WHERE app_session_id = ?;", [id1_2])
         self.assertEqual(res.fetchone()[0], "token 1-2 and UPDATE")
 
         # Try to create test record with empty token
@@ -72,7 +72,7 @@ class TestPusher(TestCase):
         res = pusher.cur.execute("SELECT count(*) FROM devices WHERE user_id = ?;", ["user 1"])
         self.assertEqual(res.fetchone()[0], 2)
         # Remove token 1_2
-        pusher.remove_install_id(id1_2)
+        pusher.remove_app_session_id(id1_2)
         # Check that record deleted
         res = pusher.cur.execute("SELECT count(*) FROM devices WHERE user_id = ?;", ["user 1"])
         self.assertEqual(res.fetchone()[0], 1)
@@ -91,15 +91,15 @@ class TestPusher(TestCase):
         pusher.add_subscriptions(id1_1, "Entity 2", ["att2_1", "att2_2"])
 
         # Check records
-        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE install_id = ?;", [id1_1])
+        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE app_session_id = ?;", [id1_1])
         self.assertEqual(set(res.fetchall()), set([(id1_1, "Entity 1", "att1_1"), (id1_1, "Entity 1", "att1_2"), (id1_1, "Entity 1", "att1_3"), (id1_1, "Entity 1", "att1_4"), (id1_1, "Entity 2", "att2_1"), (id1_1, "Entity 2", "att2_2")]))
 
         # Update data
         pusher.remove_subscriptions(id1_1, "Entity 2")
-        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE install_id = ?;", [id1_1])
+        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE app_session_id = ?;", [id1_1])
         self.assertEqual(set(res.fetchall()), set([(id1_1, "Entity 1", "att1_1"), (id1_1, "Entity 1", "att1_2"), (id1_1, "Entity 1", "att1_3"), (id1_1, "Entity 1", "att1_4")]))
         pusher.remove_subscriptions(id1_1)
-        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE install_id = ?;", [id1_1])
+        res = pusher.cur.execute("SELECT * FROM subscriptions WHERE app_session_id = ?;", [id1_1])
         self.assertEqual(res.fetchone(), None)
 
 
@@ -126,8 +126,8 @@ class TestPusher(TestCase):
         res = pusher.cur.execute("SELECT count(*) FROM subscriptions;")
         self.assertEqual(res.fetchone()[0], 3)
 
-        # Remove install_id record
-        pusher.remove_install_id(id1_1)
+        # Remove app_session_id record
+        pusher.remove_app_session_id(id1_1)
         # Check records
         res = pusher.cur.execute("SELECT count(*) FROM subscriptions;")
         self.assertEqual(res.fetchone()[0], 0)

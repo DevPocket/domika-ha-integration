@@ -2,17 +2,17 @@ from .const import *
 import datetime
 
 class EventConfirmation:
-    install_id: str
+    app_session_id: str
     context_id: str
     timestamp: int
 
-    def __init__(self, install_id: str, context_id: str, timestamp: int):
-        self.install_id = install_id
+    def __init__(self, app_session_id: str, context_id: str, timestamp: int):
+        self.app_session_id = app_session_id
         self.context_id = context_id
         self.timestamp = timestamp
 
     def __repr__(self):
-        return f"({self.install_id}, {self.context_id}, {self.timestamp})"
+        return f"({self.app_session_id}, {self.context_id}, {self.timestamp})"
 
     def __str__(self):
         return self.__repr__()
@@ -38,10 +38,10 @@ class EventConfirmer:
             filter(lambda conf: self._current_timestamp() - conf.timestamp < EVENT_CONFIRMATION_EXPIRATION_TIME,
                    self.confirmations))
 
-    def add_confirmation(self, install_id: str, context_id: str):
+    def add_confirmation(self, app_session_id: str, context_id: str):
         self.remove_expired()
-        self.confirmations.append(EventConfirmation(install_id, context_id, self._current_timestamp()))
+        self.confirmations.append(EventConfirmation(app_session_id, context_id, self._current_timestamp()))
 
-    def found_confirmation(self, install_id, context_id) -> bool:
-        res = [conf for conf in self.confirmations if conf.install_id == install_id and conf.context_id == context_id]
+    def found_confirmation(self, app_session_id, context_id) -> bool:
+        res = [conf for conf in self.confirmations if conf.app_session_id == app_session_id and conf.context_id == context_id]
         return len(res) > 0

@@ -14,9 +14,9 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 4
+CURRENT_DB_VERSION: int = 5
 
-# TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
+# TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
 class Pusher:
     db = None
@@ -64,7 +64,7 @@ class Pusher:
 
             CREATE TABLE if not exists devices (
                 user_id TEXT NOT NULL, 
-                install_id TEXT PRIMARY KEY NOT NULL, 
+                app_session_id TEXT PRIMARY KEY NOT NULL, 
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
@@ -72,11 +72,11 @@ class Pusher:
                 ); 
 
             CREATE TABLE if not exists subscriptions (
-                install_id TEXT REFERENCES devices(install_id) ON UPDATE CASCADE ON DELETE CASCADE,
+                app_session_id TEXT REFERENCES devices(app_session_id) ON UPDATE CASCADE ON DELETE CASCADE,
                 entity_id TEXT NOT NULL,
                 attribute TEXT NOT NULL,
                 need_push INTEGER NOT NULL,
-                UNIQUE(install_id, entity_id, attribute)
+                UNIQUE(app_session_id, entity_id, attribute)
                 ); 
 
             CREATE TABLE if not exists events (
@@ -89,7 +89,7 @@ class Pusher:
                 ); 
 
             CREATE TABLE if not exists push_data (
-                install_id TEXT NOT NULL,
+                app_session_id TEXT NOT NULL,
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
@@ -131,19 +131,19 @@ class Pusher:
         self.db.close()
 
 
-    def update_install_id(self, install_id, user_id) -> str:
-        push_logger.log_debug(f"update_install_id, install_id={install_id}, user_id={user_id}")
+    def update_app_session_id(self, app_session_id, user_id) -> str:
+        push_logger.log_debug(f"update_app_session_id, app_session_id={app_session_id}, user_id={user_id}")
         if not user_id:
-            push_logger.log_error(f"update_install_id: user_id can not be empty")
+            push_logger.log_error(f"update_app_session_id: user_id can not be empty")
             return ""
         else:
             with LOCK_ALL:
-                # Try to find the proper record. If no install_id found or user_id is a mismatch — generate a new one.
+                # Try to find the proper record. If no app_session_id found or user_id is a mismatch — generate a new one.
                 res = self.cur.execute("""
-                    SELECT install_id, user_id
+                    SELECT app_session_id, user_id
                     FROM devices
-                    WHERE install_id = ?
-                    ;""", [install_id])
+                    WHERE app_session_id = ?
+                    ;""", [app_session_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
@@ -153,49 +153,49 @@ class Pusher:
                         self.cur.execute("""
                             UPDATE devices
                             SET last_update = datetime('now')
-                            WHERE install_id = ?
-                            ;""", [install_id])
+                            WHERE app_session_id = ?
+                            ;""", [app_session_id])
                         self.db.commit()
-                        return install_id
+                        return app_session_id
                     else:
                         # If a mismatch — remove old record.
-                        self.remove_install_id(install_id)
+                        self.remove_app_session_id(app_session_id)
 
-                # If we didn't find the right install_id we need to generate one
+                # If we didn't find the right app_session_id we need to generate one
                 success = False
-                new_install_id = str(uuid4())
+                new_app_session_id = str(uuid4())
                 while not success:
-                    res = self.cur.execute("""SELECT count(*) FROM devices WHERE install_id = ? """,[new_install_id])
+                    res = self.cur.execute("""SELECT count(*) FROM devices WHERE app_session_id = ? """,[new_app_session_id])
                     if res.fetchone()[0] == 0:
                         success = True
                     else:
-                        new_install_id = str(uuid4())
+                        new_app_session_id = str(uuid4())
 
                 try:
                     self.cur.execute("""
-                        INSERT INTO devices (user_id, install_id, token, platform, environment, last_update) 
+                        INSERT INTO devices (user_id, app_session_id, token, platform, environment, last_update) 
                         VALUES (?, ?, "", "", "", datetime('now'))
-                        ;""", [user_id, new_install_id])
+                        ;""", [user_id, new_app_session_id])
                     self.db.commit()
-                    return new_install_id
+                    return new_app_session_id
                 except sqlite3.Error as er:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
     # Returns 1 if success
-    # Returns 0 if install_id exists, but token can't be activated
-    # Returns -1 if install_id does not exist for this user_id
-    def update_push_notification_token(self, install_id, user_id, token, platform, environment) -> int:
-        push_logger.log_debug(f"update_push_notification_token, install_id={install_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
+    # Returns 0 if app_session_id exists, but token can't be activated
+    # Returns -1 if app_session_id does not exist for this user_id
+    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
+        push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or token is None or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
-                    SELECT install_id
+                    SELECT app_session_id
                     FROM devices
-                    WHERE install_id = ? AND
+                    WHERE app_session_id = ? AND
                           user_id = ?
-                    ;""", [install_id, user_id])
+                    ;""", [app_session_id, user_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
@@ -213,8 +213,8 @@ class Pusher:
                                 platform = ?,
                                 environment = ?,
                                 last_update = datetime('now')
-                            WHERE install_id = ?
-                            ;""", [token, platform, environment, install_id])
+                            WHERE app_session_id = ?
+                            ;""", [token, platform, environment, app_session_id])
                         self.db.commit()
                         return 1
                     else:
@@ -224,44 +224,44 @@ class Pusher:
                     return -1
 
 
-    def remove_install_id(self, install_id):
-        push_logger.log_debug(f"remove_install_id, install_id={install_id}")
-        if not install_id:
-            push_logger.log_error(f"remove_install_id: install_id is empty, no record was removed: install_id: {install_id} ")
+    def remove_app_session_id(self, app_session_id):
+        push_logger.log_debug(f"remove_app_session_id, app_session_id={app_session_id}")
+        if not app_session_id:
+            push_logger.log_error(f"remove_app_session_id: app_session_id is empty, no record was removed: app_session_id: {app_session_id} ")
         else:
-            self.cur.execute("DELETE FROM devices WHERE install_id = ?;", [install_id])
+            self.cur.execute("DELETE FROM devices WHERE app_session_id = ?;", [app_session_id])
             self.db.commit()
 
 
-    def resubscribe(self, install_id, subscriptions):
-        push_logger.log_debug(f"resubscribe, install_id={install_id}, subscriptions={subscriptions}")
+    def resubscribe(self, app_session_id, subscriptions):
+        push_logger.log_debug(f"resubscribe, app_session_id={app_session_id}, subscriptions={subscriptions}")
         with LOCK_ALL:
-            if not install_id or not subscriptions:
-                push_logger.log_error(f"resubscribe: one of the fields is empty, no record was updated: install_id: {install_id}, subscriptions={subscriptions} ")
+            if not app_session_id or not subscriptions:
+                push_logger.log_error(f"resubscribe: one of the fields is empty, no record was updated: app_session_id: {app_session_id}, subscriptions={subscriptions} ")
             else:
                 data = []
                 for entity_id in subscriptions:
                     attributes = subscriptions.get(entity_id)
                     for att in attributes:
-                        data.append((install_id, entity_id, att, 0))
+                        data.append((app_session_id, entity_id, att, 0))
 
                 try:
-                    self.cur.execute("DELETE FROM subscriptions WHERE install_id = ? ;", [install_id])
+                    self.cur.execute("DELETE FROM subscriptions WHERE app_session_id = ? ;", [app_session_id])
                     self.cur.executemany("""
-                        INSERT INTO subscriptions (install_id, entity_id, attribute, need_push) 
+                        INSERT INTO subscriptions (app_session_id, entity_id, attribute, need_push) 
                         VALUES (?, ?, ?, ?)
                         ;""", data)
-                    self.cur.execute("UPDATE devices SET last_update = datetime('now') WHERE install_id = ? ;", [install_id])
+                    self.cur.execute("UPDATE devices SET last_update = datetime('now') WHERE app_session_id = ? ;", [app_session_id])
                     self.db.commit()
                 except sqlite3.Error as er:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    def resubscribe_push(self, install_id, subscriptions):
-        push_logger.log_debug(f"resubscribe_push, install_id={install_id}, subscriptions={subscriptions}")
+    def resubscribe_push(self, app_session_id, subscriptions):
+        push_logger.log_debug(f"resubscribe_push, app_session_id={app_session_id}, subscriptions={subscriptions}")
         with LOCK_ALL:
-            if not install_id or not subscriptions:
-                push_logger.log_error(f"resubscribe_push: one of the fields is empty, no record was updated: install_id: {install_id}, subscriptions={subscriptions} ")
+            if not app_session_id or not subscriptions:
+                push_logger.log_error(f"resubscribe_push: one of the fields is empty, no record was updated: app_session_id: {app_session_id}, subscriptions={subscriptions} ")
             else:
                 self.cur.execute("""
                     UPDATE subscriptions
@@ -272,13 +272,13 @@ class Pusher:
                 for entity_id in subscriptions:
                     attributes = subscriptions.get(entity_id)
                     for att in attributes:
-                        data.append((install_id, entity_id, att))
+                        data.append((app_session_id, entity_id, att))
 
                 try:
                     self.cur.executemany("""
                         UPDATE subscriptions
                         SET need_push = 1
-                        WHERE install_id = ? AND 
+                        WHERE app_session_id = ? AND 
                               entity_id  = ? AND
                               attribute = ? 
                         ;""", data)
@@ -287,18 +287,18 @@ class Pusher:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    def install_ids_for_event(self, entity_id: str, attributes: set) -> list:
-        push_logger.log_debug(f"install_ids_for_event, entity_id={entity_id}, attributes={attributes}")
+    def app_session_ids_for_event(self, entity_id: str, attributes: set) -> list:
+        push_logger.log_debug(f"app_session_ids_for_event, entity_id={entity_id}, attributes={attributes}")
         with LOCK_ALL:
             if not entity_id or not attributes:
-                push_logger.log_error(f"install_ids_for_event: one of the fields is empty, no record was updated: entity_id={entity_id}, attributes={attributes} ")
+                push_logger.log_error(f"app_session_ids_for_event: one of the fields is empty, no record was updated: entity_id={entity_id}, attributes={attributes} ")
             else:
                 atts = dict(attributes)
                 json_atts = json.dumps(atts)
                 try:
-                    self.db.set_trace_callback(print)
+                    # self.db.set_trace_callback(print)
                     db_res = self.cur.execute(f"""
-                        SELECT DISTINCT install_id
+                        SELECT DISTINCT app_session_id
                         FROM subscriptions s
                         JOIN (SELECT key FROM json_each(?)) atts 
                             ON s.attribute = atts.key 
@@ -309,21 +309,21 @@ class Pusher:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    # Fetches the list of entites and their attributes this install_id is subscribed to (only those with need_push = 1)
-    def push_attributes_for_install_id(self, install_id: str) -> list:
-        push_logger.log_debug(f"push_attributes_for_install_id, install_id={install_id}")
+    # Fetches the list of entites and their attributes this app_session_id is subscribed to (only those with need_push = 1)
+    def push_attributes_for_app_session_id(self, app_session_id: str) -> list:
+        push_logger.log_debug(f"push_attributes_for_app_session_id, app_session_id={app_session_id}")
         with LOCK_ALL:
             entities_list = []
-            if not install_id:
-                push_logger.log_error(f"push_attributes_for_install_id: install_id cannot be empty ")
+            if not app_session_id:
+                push_logger.log_error(f"push_attributes_for_app_session_id: app_session_id cannot be empty ")
             else:
                 db_res = self.cur.execute(f"""
                     SELECT entity_id, attribute
                     FROM subscriptions s
-                    WHERE install_id = ? AND
+                    WHERE app_session_id = ? AND
                           need_push = 1
                     ORDER BY entity_id
-                    ;""", [install_id])
+                    ;""", [app_session_id])
 
                 last_entity_id = None
                 entity_attributes = []
@@ -389,14 +389,14 @@ class Pusher:
         push_logger.log_debug(f"process_events")
         try:
             self.cur.execute("""
-                INSERT INTO push_data (install_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
-                    SELECT d.install_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
+                INSERT INTO push_data (app_session_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
+                    SELECT d.app_session_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
                     FROM events e
                         JOIN subscriptions s ON
                             e.entity_id = s.entity_id AND
                             e.attribute = s.attribute
                         JOIN devices d ON
-                            s.install_id = d.install_id
+                            s.app_session_id = d.app_session_id
                     WHERE s.need_push = 1 AND 
                           d.token != ''
                 ON CONFLICT(token, entity_id, attribute) DO UPDATE 
@@ -410,7 +410,7 @@ class Pusher:
         except sqlite3.Error as er:
             push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
-    def remove_old_install_ids(self):
+    def remove_old_app_session_ids(self):
         self.cur.execute("""
             DELETE FROM devices
             WHERE julianday('now') - julianday(last_update) > ?
@@ -422,10 +422,10 @@ class Pusher:
         with LOCK_ALL:
             try:
                 # Remove all install ids which did not update themselves for a long time
-                self.remove_old_install_ids()
+                self.remove_old_app_session_ids()
 
                 db_res = self.cur.execute("""
-                    SELECT token, environment, entity_id, attribute, value, install_id, context_id, timestamp
+                    SELECT token, environment, entity_id, attribute, value, app_session_id, context_id, timestamp
                     FROM push_data
                     WHERE platform = ?
                     ORDER BY token, entity_id
@@ -443,8 +443,8 @@ class Pusher:
                 current_entity_id = None
                 for row in res:
                     # If already confirmed — skip
-                    if event_confirmer.found_confirmation(row["install_id"], row["context_id"]):
-                        push_logger.log_debug(f'found a row to skip: {row["install_id"]}, {row["context_id"]}')
+                    if event_confirmer.found_confirmation(row["app_session_id"], row["context_id"]):
+                        push_logger.log_debug(f'found a row to skip: {row["app_session_id"]}, {row["context_id"]}')
                         continue
                     # First row
                     if current_token is None:

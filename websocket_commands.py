@@ -220,3 +220,46 @@ def websocket_domika_critical_sensors(
         msg.get("id"), sensors_data
     )
     pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/websocket_domika_save_dashboards",
+        vol.Required("dashboards"): str,
+    }
+)
+@callback
+def websocket_domika_save_dashboards(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "save_dashboards", data: {msg}')
+    pusher = push.Pusher("")
+    sensors_data = pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
+    connection.send_result(
+        msg.get("id"), {}
+    )
+    pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/websocket_domika_get_dashboards",
+    }
+)
+@callback
+def websocket_domika_get_dashboards(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "get_dashboards", data: {msg}')
+    pusher = push.Pusher("")
+    dashboards = pusher.get_dashboards(connection.user.id)
+    connection.send_result(
+        msg.get("id"), dashboards
+    )
+    pusher.close_connection()

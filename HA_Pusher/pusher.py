@@ -14,7 +14,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 3
+CURRENT_DB_VERSION: int = 4
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as install_id works as a PK
 
@@ -43,6 +43,7 @@ class Pusher:
                 DROP TABLE if exists events;
                 DROP TABLE if exists subscriptions;
                 DROP TABLE if exists devices;
+                DROP TABLE if exists dashboards;
                 DROP TABLE if exists db_version;
                 """)
 
@@ -56,6 +57,11 @@ class Pusher:
             self.update_db_version()
 
         self.cur.executescript("""
+            CREATE TABLE if not exists dashboards (
+                user_id TEXT PRIMARY KEY NOT NULL, 
+                dashboards TEXT NOT NULL 
+                ); 
+
             CREATE TABLE if not exists devices (
                 user_id TEXT NOT NULL, 
                 install_id TEXT PRIMARY KEY NOT NULL, 
@@ -483,3 +489,24 @@ class Pusher:
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:
             TOKENS_TO_DELETE.add(token)
+
+    def save_dashboards(self, user_id: str, dashboards: str):
+        self.cur.execute("""
+            INSERT INTO dashboards (user_id, dashboards) 
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                dashboards = excluded.dashboards
+            ;""", [user_id, dashboards])
+        self.db.commit()
+
+    def get_dashboards(self, user_id: str) -> str:
+        db_res = self.cur.execute("""
+            SELECT dashboards 
+            FROM dashboards 
+            WHERE user_id = ?
+            ;""", [user_id])
+        res = list(db_res.fetchall())
+        if res:
+            return res[0][0]
+        else:
+            return ""

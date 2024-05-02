@@ -113,7 +113,7 @@ def websocket_domika_delete_push_token(
     {
         vol.Required("type"): "domika/update_push_session",
         vol.Required("original_transaction_id"): str,
-        vol.Required("token"): str,
+        vol.Required("push_token_hex"): str,
         vol.Required("platform"): str,
         vol.Required("environment"): str,
     }
@@ -128,7 +128,7 @@ def websocket_domika_update_push_session(
     LOGGER.debug(f'Got websocket message "update_push_session", data: {msg}')
 
     original_transaction_id = msg.get("original_transaction_id")
-    token = msg.get("token")
+    token = msg.get("push_token_hex")
     platform = msg.get("platform")
     environment = msg.get("environment")
 

@@ -22,7 +22,7 @@ EVENT_CONFIRMER: confirm_events.EventConfirmer = confirm_events.EventConfirmer()
     }
 )
 @callback
-def websocket_domika_update_app_session_id(
+def websocket_domika_update_app_session(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
@@ -66,11 +66,12 @@ def websocket_domika_update_push_token(
         msg.get("platform"),
         msg.get("environment")
     )
+    pusher.close_connection()
     connection.send_result(
         msg.get("id"), {"result": res}
     )
-    pusher.close_connection()
 
+    dict_attributes = None
     if res == 1:
         dict_attributes = {"push_activation_success": True}
     elif res == 2:
@@ -92,7 +93,7 @@ def websocket_domika_update_push_token(
     }
 )
 @callback
-def websocket_domika_delete_push_token(
+def websocket_domika_remove_app_session(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
@@ -103,10 +104,10 @@ def websocket_domika_delete_push_token(
     pusher.remove_app_session_id(
         msg.get("app_session_id")
     )
-    connection.send_result(
-        msg.get("id"), {}
-    )
     pusher.close_connection()
+    connection.send_result(
+        msg.get("id"), remove_push_session(msg.get("app_session_id"))
+    )
 
 
 @websocket_api.websocket_command(
@@ -182,6 +183,22 @@ def websocket_domika_verify_push_session(
         connection.send_result( msg.get("id"), {"result": 0, "text": "one of the parameters is missing"} )
 
 
+def remove_push_session(app_session_id):
+    if app_session_id:
+        pusher = push.Pusher("")
+        push_session_id = pusher.get_push_session(app_session_id)
+        pusher.save_push_session(app_session_id, "")
+        pusher.close_connection()
+        if push_session_id:
+            r = requests.post('https://domika.app/remove_push_session',
+                              json={"push_session_id": push_session_id})
+            LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
+            return {"result": 1, "text": "ok"}
+        else:
+            return {"result": 0, "text": f"push_session_id not found for app_session_id: {app_session_id}"}
+    else:
+        return {"result": 0, "text": "missing app_session_id"}
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "domika/remove_push_session",
@@ -197,21 +214,7 @@ def websocket_domika_remove_push_session(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "remove_push_session", data: {msg}')
     app_session_id = msg.get("app_session_id")
-
-    if app_session_id:
-        pusher = push.Pusher("")
-        push_session_id = pusher.get_push_session(app_session_id)
-        pusher.save_push_session(app_session_id, "")
-        pusher.close_connection()
-        if push_session_id:
-            r = requests.post('https://domika.app/remove_push_session',
-                              json={"push_session_id": push_session_id})
-            LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
-            connection.send_result( msg.get("id"), {"result": 1, "text": "ok"} )
-        else:
-            connection.send_result(msg.get("id"), {"result": 0, "text": f"push_session_id not found for app_session_id: {app_session_id}"})
-    else:
-        connection.send_result( msg.get("id"), {"result": 0, "text": "missing app_session_id"} )
+    connection.send_result( msg.get("id"), remove_push_session(app_session_id) )
 
 
 @websocket_api.websocket_command(

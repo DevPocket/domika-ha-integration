@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from . HA_Pusher import pusher as push
 from . HA_Pusher import confirm_events
 
@@ -83,7 +85,7 @@ def websocket_domika_update_push_token(
 
     if dict_attributes:
         LOGGER.debug(f"""### domika_state_changed_{app_session_id}, {dict_attributes} """)
-        hass.bus.async_fire(f"domika_state_changed_{app_session_id}", dict_attributes)
+        hass.bus.async_fire_internal(f"domika_state_changed_{app_session_id}", dict_attributes)
 
 
 @websocket_api.websocket_command(

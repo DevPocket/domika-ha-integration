@@ -1,5 +1,8 @@
-from .const import *
 import datetime
+from typing import List
+
+from .const import *
+
 
 class EventConfirmation:
     app_session_id: str
@@ -12,20 +15,20 @@ class EventConfirmation:
         self.timestamp = timestamp
 
     def __repr__(self):
-        return f"({self.app_session_id}, {self.context_id}, {self.timestamp})"
+        return f'({self.app_session_id}, {self.context_id}, {self.timestamp})'
 
     def __str__(self):
         return self.__repr__()
 
 
 class EventConfirmer:
-    confirmations: [EventConfirmation]
+    confirmations: List[EventConfirmation]
 
     def __init__(self):
         self.confirmations = []
 
     def __repr__(self):
-        return f"confirmations: {self.confirmations}"
+        return f'confirmations: {self.confirmations}'
 
     def __str__(self):
         return self.__repr__()
@@ -35,13 +38,23 @@ class EventConfirmer:
 
     def remove_expired(self):
         self.confirmations = list(
-            filter(lambda conf: self._current_timestamp() - conf.timestamp < EVENT_CONFIRMATION_EXPIRATION_TIME,
-                   self.confirmations))
+            filter(
+                lambda conf: self._current_timestamp() - conf.timestamp
+                < EVENT_CONFIRMATION_EXPIRATION_TIME,
+                self.confirmations,
+            )
+        )
 
     def add_confirmation(self, app_session_id: str, context_id: str):
         self.remove_expired()
-        self.confirmations.append(EventConfirmation(app_session_id, context_id, self._current_timestamp()))
+        self.confirmations.append(
+            EventConfirmation(app_session_id, context_id, self._current_timestamp())
+        )
 
     def found_confirmation(self, app_session_id, context_id) -> bool:
-        res = [conf for conf in self.confirmations if conf.app_session_id == app_session_id and conf.context_id == context_id]
+        res = [
+            conf
+            for conf in self.confirmations
+            if conf.app_session_id == app_session_id and conf.context_id == context_id
+        ]
         return len(res) > 0

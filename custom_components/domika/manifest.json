@@ -7,7 +7,12 @@
   "config_flow": true,
   "single_config_entry": true,
   "dependencies": ["websocket_api"],
-  "requirements": ["aioapns"],
+  "loggers": ["Domika"],
+  "requirements": [
+    "alembic == 1.13.1",
+    "aioapns",
+    "aiosqlite == 0.20.0"
+  ],
   "documentation": "https://github.com/bealex",
   "integration_type": "service",
   "quality_scale": "internal"

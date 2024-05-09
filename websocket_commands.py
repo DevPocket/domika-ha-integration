@@ -366,7 +366,7 @@ def websocket_domika_save_dashboards(
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
-    LOGGER.debug(f'Got websocket message "update_dashboards", data: {msg}')
+    LOGGER.debug(f'Got websocket message "update_dashboards", user: {connection.user.id}, data: {msg}')
     pusher = push.Pusher("")
     sensors_data = pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
     connection.send_result(
@@ -387,10 +387,10 @@ def websocket_domika_get_dashboards(
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
-    LOGGER.debug(f'Got websocket message "get_dashboards", data: {msg}')
+    LOGGER.debug(f'Got websocket message "get_dashboards", user: {connection.user.id}, data: {msg}')
     pusher = push.Pusher("")
     dashboards = pusher.get_dashboards(connection.user.id)
     connection.send_result(
-        msg.get("id"), dashboards
+        msg.get("id"), {"dashboards": dashboards}
     )
     pusher.close_connection()

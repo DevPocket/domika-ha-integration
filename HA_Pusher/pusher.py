@@ -1,6 +1,5 @@
 # Pusher
 from . import push_logger
-from .confirm_events import *
 from .const import *
 
 import sqlite3
@@ -14,7 +13,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 9
+CURRENT_DB_VERSION: int = 10
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
@@ -80,10 +79,10 @@ class Pusher:
                 ); 
 
             CREATE TABLE if not exists events (
+                event_id TEXT NOT NULL,
                 entity_id TEXT NOT NULL,
                 attribute TEXT NOT NULL,
                 value TEXT NOT NULL,
-                context_id TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 UNIQUE(entity_id, attribute)
                 ); 
@@ -94,10 +93,10 @@ class Pusher:
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
                 environment TEXT NOT NULL,
+                event_id TEXT NOT NULL,
                 entity_id TEXT NOT NULL,
                 attribute TEXT NOT NULL,
                 value TEXT NOT NULL,
-                context_id TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 UNIQUE(token, entity_id, attribute)
                 ); 
@@ -371,7 +370,7 @@ class Pusher:
             return entities_list
 
 
-    def add_event(self, entity_id, attributes, context_id, timestamp):
+    def add_event(self, entity_id, attributes, event_id, timestamp):
         def remove_tokens_to_delete():
             global TOKENS_TO_DELETE
             tokens = TOKENS_TO_DELETE.copy()
@@ -389,21 +388,21 @@ class Pusher:
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
-        push_logger.log_debug(f"add_event, entity_id={entity_id}, attributes={attributes}, context_id={context_id}, timestamp={timestamp}")
+        push_logger.log_debug(f"add_event, entity_id={entity_id}, attributes={attributes}, event_id={event_id}, timestamp={timestamp}")
         # Remove all tokens which were marked as bad
         remove_tokens_to_delete()
 
-        if not entity_id or not attributes or not timestamp:
-            push_logger.log_error(f"add_event: one of the fields is empty, no record was updated: entity_id: {entity_id}, attributes: {attributes}, timestamp: {timestamp} ")
+        if not entity_id or not attributes or not timestamp or not event_id:
+            push_logger.log_error(f"add_event: one of the fields is empty, no record was updated: entity_id={entity_id}, attributes={attributes}, event_id={event_id}, timestamp={timestamp} ")
         else:
             with LOCK_ALL:
                 data = []
                 for element in attributes:
-                    data.append((entity_id, element[0], element[1], context_id or "", timestamp))
+                    data.append((entity_id, element[0], element[1], event_id, timestamp))
 
                 try:
                     self.cur.executemany("""
-                        INSERT INTO events (entity_id, attribute, value, context_id, timestamp) 
+                        INSERT INTO events (entity_id, attribute, value, event_id, timestamp) 
                         VALUES (?, ?, ?, ?, ?)
                         ON CONFLICT(entity_id, attribute) DO UPDATE SET
                             value = excluded.value,
@@ -420,8 +419,8 @@ class Pusher:
         push_logger.log_debug(f"process_events")
         try:
             self.cur.execute("""
-                INSERT INTO push_data (app_session_id, push_session_id, token, platform, environment, entity_id, attribute, value, context_id, timestamp) 
-                    SELECT d.app_session_id, d.push_session_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.context_id, e.timestamp 
+                INSERT INTO push_data (app_session_id, push_session_id, token, platform, environment, entity_id, attribute, value, event_id, timestamp) 
+                    SELECT d.app_session_id, d.push_session_id, d.token, d.platform, d.environment, e.entity_id, e.attribute, e.value, e.event_id, e.timestamp 
                     FROM events e
                         JOIN subscriptions s ON
                             e.entity_id = s.entity_id AND
@@ -449,15 +448,15 @@ class Pusher:
             ;""", [DEVICE_EXPIRATION_TIME])
         self.db.commit()
 
-    def generate_push_notifications_ios(self, event_confirmer: EventConfirmer):
-        push_logger.log_debug(f"generate_push_notifications_ios, event_confirmer={event_confirmer}")
+    def generate_push_notifications_ios(self):
+        push_logger.log_debug(f"generate_push_notifications_ios")
         with LOCK_ALL:
             try:
                 # Remove all install ids which did not update themselves for a long time
                 self.remove_old_app_session_ids()
 
                 db_res = self.cur.execute("""
-                    SELECT token, environment, entity_id, attribute, value, app_session_id, push_session_id, context_id, timestamp
+                    SELECT token, environment, entity_id, attribute, value, app_session_id, push_session_id, event_id, timestamp
                     FROM push_data
                     WHERE platform = ?
                     ORDER BY token, entity_id
@@ -475,10 +474,6 @@ class Pusher:
                 current_push_session_id = None
                 current_entity_id = None
                 for row in res:
-                    # If already confirmed — skip
-                    if event_confirmer.found_confirmation(row["app_session_id"], row["context_id"]):
-                        push_logger.log_debug(f'found a row to skip: {row["app_session_id"]}, {row["context_id"]}')
-                        continue
                     # First row
                     if current_token is None:
                         current_token = row["token"]
@@ -510,8 +505,6 @@ class Pusher:
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
-        # No matter what — remove expired.
-        event_confirmer.remove_expired()
 
     def send_notification_ios(self, push_session_id, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
@@ -555,3 +548,18 @@ class Pusher:
                 else:
                     return ""
 
+    def confirm_events(self, app_session_id: str, event_ids: list[str]):
+        with LOCK_ALL:
+            if not app_session_id or not event_ids:
+                push_logger.log_error(f"confirm_events: one of the fields is empty, no record was updated: app_session_id: {app_session_id}, event_ids={event_ids} ")
+            else:
+                data = []
+                for event_id in event_ids:
+                    data.append( (app_session_id, event_id) )
+
+                self.cur.executemany("""
+                    DELETE FROM push_data
+                    WHERE app_session_id = ? AND
+                          event_id = ?
+                ;""", data)
+                self.db.commit()

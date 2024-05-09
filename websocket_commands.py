@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 from . HA_Pusher import pusher as push
-from . HA_Pusher import confirm_events
 
 import voluptuous as vol
 import orjson
@@ -14,7 +13,6 @@ from .functions import *
 import requests
 
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
-EVENT_CONFIRMER: confirm_events.EventConfirmer = confirm_events.EventConfirmer()
 
 
 @websocket_api.websocket_command(
@@ -315,18 +313,23 @@ def websocket_domika_resubscribe_push(
     {
         vol.Required("type"): "domika/confirm_event",
         vol.Required("app_session_id"): str,
-        vol.Required("context_id"): str
+        vol.Required("event_ids"): list[str]
     }
 )
 @callback
-def websocket_domika_confirm_event(
+def websocket_domika_confirm_events(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "confirm_event", data: {msg}')
-    EVENT_CONFIRMER.add_confirmation(msg.get("app_session_id"), msg.get("context_id"))
+    event_ids = msg.get("event_ids")
+    app_session_id = msg.get("app_session_id")
+    if event_ids and app_session_id:
+        pusher = push.Pusher("")
+        pusher.confirm_events(app_session_id, event_ids)
+
     connection.send_result(
         msg.get("id"), {}
     )

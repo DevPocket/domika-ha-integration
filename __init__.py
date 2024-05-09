@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 from http import HTTPStatus
+from uuid import uuid4
 
 from aiohttp import web
 from homeassistant.components.api import APIDomainServicesView, APIServicesView
@@ -27,7 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     def generate_push_notifications_ios(time):
         pusher = push.Pusher("")
-        pusher.generate_push_notifications_ios(EVENT_CONFIRMER)
+        pusher.generate_push_notifications_ios()
         pusher.close_connection()
 
     hass.http.register_view(DomikaAPIDomainServicesView)
@@ -42,7 +43,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_domika_remove_push_session)
     websocket_api.async_register_command(hass, websocket_domika_resubscribe)
     websocket_api.async_register_command(hass, websocket_domika_resubscribe_push)
-    websocket_api.async_register_command(hass, websocket_domika_confirm_event)
+    websocket_api.async_register_command(hass, websocket_domika_confirm_events)
     websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     websocket_api.async_register_command(hass, websocket_domika_save_dashboards)
     websocket_api.async_register_command(hass, websocket_domika_get_dashboards)
@@ -162,6 +163,7 @@ def forward_event(event):
 
     if event.event_type == "state_changed":
         LOGGER.debug(f">>> Got event for entity: {event.data['entity_id']}")
+        event_id = str(uuid4())
         # Make a flat dict from state data.
         old_attributes = event_data_to_dict(event.data["old_state"]) or {}
         new_attributes = event_data_to_dict(event.data["new_state"]) or {}
@@ -177,6 +179,7 @@ def forward_event(event):
         #     """)
 
         if attributes:
+            attributes.add( ("event_id", event_id) )
             if entity_id.startswith("binary_sensor."):
                 # Get device_class for this binary sensor.
                 sensor = HASS.states.get(entity_id)
@@ -197,7 +200,7 @@ def forward_event(event):
                 fire_events_to_app_session_ids(app_session_ids)
 
             # Record event in Pusher db.
-            pusher.add_event(entity_id, attributes, event.context.id, event.time_fired.timestamp() * 1e6)
+            pusher.add_event(entity_id, attributes, event_id, event.time_fired.timestamp() * 1e6)
             pusher.close_connection()
 
 

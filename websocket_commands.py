@@ -355,7 +355,7 @@ def websocket_domika_critical_sensors(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "domika/websocket_domika_save_dashboards",
+        vol.Required("type"): "domika/update_dashboards",
         vol.Required("dashboards"): str,
     }
 )
@@ -366,7 +366,7 @@ def websocket_domika_save_dashboards(
         msg: dict[str, Any],
 ) -> None:
     """Handle domika request."""
-    LOGGER.debug(f'Got websocket message "save_dashboards", data: {msg}')
+    LOGGER.debug(f'Got websocket message "update_dashboards", data: {msg}')
     pusher = push.Pusher("")
     sensors_data = pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
     connection.send_result(
@@ -377,7 +377,7 @@ def websocket_domika_save_dashboards(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "domika/websocket_domika_get_dashboards",
+        vol.Required("type"): "domika/get_dashboards",
     }
 )
 @callback

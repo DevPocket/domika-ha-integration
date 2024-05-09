@@ -556,6 +556,7 @@ class Pusher:
                 data = []
                 for event_id in event_ids:
                     data.append( (app_session_id, event_id) )
+                print(data)
 
                 self.cur.executemany("""
                     DELETE FROM push_data

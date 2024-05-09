@@ -28,21 +28,23 @@ def test_init(pusher: push.Pusher):
 
 def test_events(pusher: push.Pusher):
     bmikle_id = pusher.update_app_session_id(None)
+    pusher.save_push_session(bmikle_id, "aaabbbccc")
+    pusher.update_push_notification_token(bmikle_id, "aaabbbccc", IOS_PLATFORM, IOS_SANDBOX_ENV)
     pusher.resubscribe(bmikle_id, {"Entity 1": ["A", "B"], "Entity 2": ["X", "Y", "Z"]})
     pusher.resubscribe_push(bmikle_id, {"Entity 1": ["A"], "Entity 2": ["X", "Y"]})
     print(pusher.push_attributes_for_app_session_id(bmikle_id))
     print(pusher.app_session_ids_for_event("Entity 1", {("A", "1"), ("B1", "2"), ("X1", "3")}))
 
-    pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "cont1", 100)
-    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
-    pusher.generate_push_notifications_ios()
-    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
-
+    pusher.add_event("Entity 1", set({"A": "1", "B": "2", "C": "3", "D": "4"}.items()), "id1", 100)
+    pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "id2", 200)
+    pusher.confirm_events(bmikle_id, ["id2"])
+    # pusher.generate_push_notifications_ios()
+    # pusher.add_event("Entity 2", set({"X": "x", "Y": "y"}.items()), "cont2", 200)
 
 
 if __name__ == '__main__':
     pusher = push.Pusher("", True)
-    test_dashboards(pusher)
-    test_init(pusher)
+    # test_dashboards(pusher)
+    # test_init(pusher)
     test_events(pusher)
 

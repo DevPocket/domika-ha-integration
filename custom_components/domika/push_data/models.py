@@ -47,7 +47,7 @@ class DomikaPushDataBase(DataClassJSONMixin):
 
 
 @dataclass
-class DomikaPushDatanCreate(DomikaPushDataBase):
+class DomikaPushDataCreate(DomikaPushDataBase):
     """Push data create model."""
 
 

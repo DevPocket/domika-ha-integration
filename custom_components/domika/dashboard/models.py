@@ -34,12 +34,12 @@ class DomikaDashboardBase(DataClassJSONMixin):
 
 
 @dataclass
-class DomikaDashoardCreate(DomikaDashboardBase):
+class DomikaDashboardCreate(DomikaDashboardBase):
     """Dashboard create model."""
 
 
 @dataclass
-class DomikaDashoardRead(DomikaDashboardBase):
+class DomikaDashboardRead(DomikaDashboardBase):
     """Dashboard read model."""
 
 

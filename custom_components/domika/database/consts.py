@@ -9,6 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 DATABASE_URL = 'sqlite+aiosqlite:///Domika.db'
+ALEMBIC_INI_PATH = 'config/custom_components/domika/alembic.ini'
 
 # Event confirmation records will stay at least 15 seconds
 EVENT_CONFIRMATION_EXPIRATION_TIME = 15 * 1e6

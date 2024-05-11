@@ -12,6 +12,7 @@ import alembic.command
 from alembic.config import Config
 from sqlalchemy import Connection
 
+from .consts import ALEMBIC_INI_PATH
 from .core import ENGINE
 
 
@@ -23,6 +24,6 @@ def _run_upgrade(connection: Connection, cfg: Config):
 
 async def migrate():
     """Perform database migration."""
-    alembic_config = Config('config/custom_components/domika/alembic.ini')
+    alembic_config = Config(ALEMBIC_INI_PATH)
     async with ENGINE.begin() as conn:
         await conn.run_sync(_run_upgrade, alembic_config)

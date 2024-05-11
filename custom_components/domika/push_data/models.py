@@ -37,8 +37,8 @@ class PushData(AsyncBase):
 
 
 @dataclass
-class DomikaSubscriptionBase(DataClassJSONMixin):
-    """Base subscription model."""
+class DomikaPushDataBase(DataClassJSONMixin):
+    """Base push data model."""
 
     app_session_id: str
     entity_id: str
@@ -47,17 +47,17 @@ class DomikaSubscriptionBase(DataClassJSONMixin):
 
 
 @dataclass
-class DomikaSubscriptionCreate(DomikaSubscriptionBase):
-    """Subscription create model."""
+class DomikaPushDatanCreate(DomikaPushDataBase):
+    """Push data create model."""
 
 
 @dataclass
-class DomikaSubscriptionRead(DomikaSubscriptionBase):
-    """Subscription read model."""
+class DomikPushDataRead(DomikaPushDataBase):
+    """Push data read model."""
 
 
 @dataclass
-class DomikaSubscriptionUpdate(DataClassJSONMixin):
-    """Subscription update model."""
+class DomikaPushDataUpdate(DataClassJSONMixin):
+    """Push data update model."""
 
     need_push: bool

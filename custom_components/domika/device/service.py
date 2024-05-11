@@ -26,8 +26,8 @@ async def get(db_session: AsyncSession, app_session_id: str) -> Optional[Device]
 
 async def create(db_session: AsyncSession, device_in: DomikaDeviceCreate, *, commit: bool = True):
     """Create new device."""
-    ping_scan_result = Device(**device_in.to_dict())
-    db_session.add(ping_scan_result)
+    device = Device(**device_in.to_dict())
+    db_session.add(device)
     await db_session.flush()
     if commit:
         await db_session.commit()

@@ -9,7 +9,6 @@ Author(s): Artem Bezborodko
 """
 
 from dataclasses import asdict
-from typing import Optional
 
 import sqlalchemy
 from sqlalchemy import select
@@ -18,10 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 
 
-async def get(db_session: AsyncSession, app_session_id: str) -> Optional[Device]:
+async def get(db_session: AsyncSession, app_session_id: str) -> Device | None:
     """Get device by application sesison id."""
-    dev = select(Device).where(Device.app_session_id == app_session_id)
-    return await db_session.scalar(dev)
+    stmt = select(Device).where(Device.app_session_id == app_session_id)
+    return await db_session.scalar(stmt)
 
 
 async def create(db_session: AsyncSession, device_in: DomikaDeviceCreate, *, commit: bool = True):
@@ -29,6 +28,7 @@ async def create(db_session: AsyncSession, device_in: DomikaDeviceCreate, *, com
     device = Device(**device_in.to_dict())
     db_session.add(device)
     await db_session.flush()
+
     if commit:
         await db_session.commit()
 

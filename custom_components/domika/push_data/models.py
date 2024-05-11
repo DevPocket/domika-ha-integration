@@ -10,6 +10,7 @@ Author(s): Artem Bezborodko
 
 import uuid
 from dataclasses import dataclass
+from typing import Optional
 
 from mashumaro.mixins.json import DataClassJSONMixin
 from sqlalchemy import ForeignKey, UniqueConstraint, func
@@ -43,7 +44,8 @@ class DomikaPushDataBase(DataClassJSONMixin):
     app_session_id: str
     entity_id: str
     attribute: str
-    need_push: bool
+    value: str
+    context_id: str
 
 
 @dataclass
@@ -55,9 +57,12 @@ class DomikaPushDataCreate(DomikaPushDataBase):
 class DomikPushDataRead(DomikaPushDataBase):
     """Push data read model."""
 
+    id: uuid.UUID
+
 
 @dataclass
 class DomikaPushDataUpdate(DataClassJSONMixin):
     """Push data update model."""
 
-    need_push: bool
+    value: Optional[str]
+    timestamp: Optional[int]

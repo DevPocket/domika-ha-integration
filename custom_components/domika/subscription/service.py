@@ -28,11 +28,11 @@ async def get(
 
     Subscriptions filtered by need_push flag.
     """
-    dev = sqlalchemy.select(Subscription).where(
+    stmt = sqlalchemy.select(Subscription).where(
         Subscription.app_session_id == app_session_id,
         Subscription.need_push == need_push,
     )
-    return (await db_session.scalars(dev)).all()
+    return (await db_session.scalars(stmt)).all()
 
 
 async def get_by_attributes(
@@ -41,11 +41,11 @@ async def get_by_attributes(
     attributes: list[str],
 ) -> Sequence[Subscription]:
     """Get all subscriptions with given entity_id that contains attribute from attributes."""
-    dev = sqlalchemy.select(Subscription).where(
+    stmt = sqlalchemy.select(Subscription).where(
         Subscription.entity_id == entity_id,
         Subscription.attribute.in_(attributes),
     )
-    return (await db_session.scalars(dev)).all()
+    return (await db_session.scalars(stmt)).all()
 
 
 async def create(

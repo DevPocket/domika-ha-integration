@@ -29,13 +29,14 @@ class Dashboard(AsyncBase):
 class DomikaDashboardBase(DataClassJSONMixin):
     """Base dashboard model."""
 
-    user_id: str
     dashboard: str
 
 
 @dataclass
 class DomikaDashboardCreate(DomikaDashboardBase):
     """Dashboard create model."""
+
+    user_id: str
 
 
 @dataclass

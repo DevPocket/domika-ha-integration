@@ -22,6 +22,8 @@ from homeassistant.helpers.typing import ConfigType
 
 from . import websocket_commands as wsc
 from .const import DOMAIN, MAIN_LOGGER_NAME, SENSORS_DEVICE_CLASSES, UPDATE_INTERVAL
+from .critical_sensors import router as critical_sensor_router
+from .dashboard import router as dashboard_router
 from .database.manage import migrate
 from .functions import (
     event_data_to_dict,
@@ -108,10 +110,12 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, wsc.websocket_domika_resubscribe)
     websocket_api.async_register_command(hass, wsc.websocket_domika_resubscribe_push)
     websocket_api.async_register_command(hass, wsc.websocket_domika_confirm_event)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_critical_sensors)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_save_dashboards)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_get_dashboards)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_critical_sensors)
+    websocket_api.async_register_command(
+        hass,
+        critical_sensor_router.websocket_domika_critical_sensors,
+    )
+    websocket_api.async_register_command(hass, dashboard_router.websocket_domika_update_dashboards)
+    websocket_api.async_register_command(hass, dashboard_router.websocket_domika_get_dashboards)
 
     async_track_time_interval(
         hass,

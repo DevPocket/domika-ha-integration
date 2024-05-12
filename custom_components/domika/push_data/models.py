@@ -9,11 +9,12 @@ Author(s): Artem Bezborodko
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
+from mashumaro import pass_through
 from mashumaro.mixins.json import DataClassJSONMixin
-from sqlalchemy import ForeignKey, UniqueConstraint, func
+from sqlalchemy import ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..models import AsyncBase
@@ -24,24 +25,40 @@ class PushData(AsyncBase):
 
     __tablename__ = 'push_data'
 
-    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4(), primary_key=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     app_session_id: Mapped[str] = mapped_column(
         ForeignKey('devices.app_session_id', ondelete='CASCADE', onupdate='CASCADE'),
+        primary_key=True,
     )
+    entity_id: Mapped[str] = mapped_column(primary_key=True)
+    attribute: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str]
+    context_id: Mapped[str]
+    timestamp: Mapped[int] = mapped_column(server_default=func.datetime('now'))
+
+
+class _Event(AsyncBase):
+    """HomeAssistant temporary event."""
+
+    __tablename__ = 'events'
+
+    event_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     entity_id: Mapped[str]
     attribute: Mapped[str]
     value: Mapped[str]
     context_id: Mapped[str]
     timestamp: Mapped[int] = mapped_column(server_default=func.datetime('now'))
 
-    __table_args__ = (UniqueConstraint('app_session_id', 'entity_id', 'attribute'),)
-
 
 @dataclass
 class DomikaPushDataBase(DataClassJSONMixin):
     """Base push data model."""
 
-    app_session_id: str
+    event_id: uuid.UUID = field(
+        metadata={
+            'serialization_strategy': pass_through,
+        },
+    )
     entity_id: str
     attribute: str
     value: str
@@ -54,10 +71,10 @@ class DomikaPushDataCreate(DomikaPushDataBase):
 
 
 @dataclass
-class DomikPushDataRead(DomikaPushDataBase):
+class DomikPushDataRead(DomikaPushDataCreate):
     """Push data read model."""
 
-    id: uuid.UUID
+    app_session_id: str
 
 
 @dataclass

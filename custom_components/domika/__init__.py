@@ -36,6 +36,7 @@ from .HA_Pusher.pusher import Pusher
 from .dashboard.models import Dashboard
 from .device.models import Device
 from .push_data.models import PushData
+from .push_data.models import _Event
 from .subscription.models import Subscription
 # isort: on
 

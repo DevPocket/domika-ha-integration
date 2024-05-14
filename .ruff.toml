@@ -84,6 +84,9 @@ ignore = [
 max-line-length = 100
 ignore-overlong-task-comments = false
 
+[lint.pydocstyle]
+convention = "google"
+
 [lint.flake8-quotes]
 docstring-quotes = "double"
 
@@ -95,3 +98,4 @@ builtins-ignorelist = ["id"]
 
 [lint.extend-per-file-ignores]
 "__init__.py" = ["F401"]
+"test*.py" = ["S101"]

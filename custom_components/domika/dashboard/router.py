@@ -81,6 +81,7 @@ async def websocket_domika_get_dashboards(
     async with AsyncSessionFactory() as session:
         dashboards = await get(session, connection.user.id)
 
+    # TODO: it is better to return None if there are no dashboards found.
     connection.send_result(
         msg_id,
         DomikaDashboardRead(**dashboards.dict()).to_dict() if dashboards else '',

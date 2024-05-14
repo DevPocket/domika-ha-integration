@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 @websocket_command(
     {
         vol.Required('type'): 'domika/confirm_event',
-        vol.Required('app_session_id'): str,
+        vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('event_ids'): [vol.Coerce(uuid.UUID)],
     },
 )

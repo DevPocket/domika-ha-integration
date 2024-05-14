@@ -9,6 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import logging
+import uuid
 from typing import Any, cast
 
 import voluptuous as vol
@@ -27,7 +28,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 @websocket_command(
     {
         vol.Required('type'): 'domika/resubscribe',
-        vol.Required('app_session_id'): str,
+        vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('subscriptions'): dict[str, set],
     },
 )
@@ -44,13 +45,9 @@ async def websocket_domika_resubscribe(
         return
 
     LOGGER.debug('Got websocket message "resubscribe", data: %s', msg)
-    app_session_id = cast(str, msg.get('app_session_id'))
+    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
 
-    # TODO: maybe some error code?
     res_list = []
-    if not app_session_id:
-        connection.send_result(msg_id, {'entities': res_list})
-        return
 
     subscriptions = cast(dict[str, set], msg.get('subscriptions'))  # Required in command schema.
     for entity_id in subscriptions:
@@ -82,7 +79,7 @@ async def websocket_domika_resubscribe(
 @websocket_command(
     {
         vol.Required('type'): 'domika/resubscribe_push',
-        vol.Required('app_session_id'): str,
+        vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('subscriptions'): dict[str, set],
     },
 )
@@ -100,11 +97,7 @@ async def websocket_domika_resubscribe_push(
 
     LOGGER.debug('Got websocket message "resubscribe_push", data: %s', msg)
 
-    app_session_id = cast(str, msg.get('app_session_id'))
-    # TODO: Move to flow.
-    if not app_session_id:
-        LOGGER.error('Got websocket message "resubscribe_push", app_session_id is empty.')
-        return
+    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
 
     async with AsyncSessionFactory() as session:
         await resubscribe_push(

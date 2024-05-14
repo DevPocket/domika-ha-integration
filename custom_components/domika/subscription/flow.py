@@ -8,6 +8,8 @@ Subscription data.
 Author(s): Artem Bezborodko
 """
 
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import DomikaSubscriptionCreate, DomikaSubscriptionUpdate
@@ -17,7 +19,7 @@ from .service import create, delete, update_in_place
 # TODO: maybe reorganize data so it can support schemas.
 async def resubscribe(
     db_session: AsyncSession,
-    app_session_id: str,
+    app_session_id: uuid.UUID,
     subscriptions: dict[str, set[str]],
 ):
     """Remove all existing subscriptions, and subscribe to the new subscriptions."""
@@ -41,7 +43,7 @@ async def resubscribe(
 # TODO: maybe reorganize data so it can support schemas.
 async def resubscribe_push(
     db_session: AsyncSession,
-    app_session_id: str,
+    app_session_id: uuid.UUID,
     subscriptions: dict[str, set[str]],
 ):
     """

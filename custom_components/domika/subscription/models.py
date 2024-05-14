@@ -8,6 +8,7 @@ Subscription data.
 Author(s): Artem Bezborodko
 """
 
+import uuid
 from dataclasses import dataclass
 
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -22,7 +23,7 @@ class Subscription(AsyncBase):
 
     __tablename__ = 'subscriptions'
 
-    app_session_id: Mapped[str] = mapped_column(
+    app_session_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('devices.app_session_id', ondelete='CASCADE', onupdate='CASCADE'),
         primary_key=True,
     )
@@ -35,7 +36,7 @@ class Subscription(AsyncBase):
 class DomikaSubscriptionBase(DataClassJSONMixin):
     """Base subscription model."""
 
-    app_session_id: str
+    app_session_id: uuid.UUID
     entity_id: str
     attribute: str
     need_push: bool

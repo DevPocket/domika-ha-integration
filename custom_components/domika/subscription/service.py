@@ -8,6 +8,7 @@ Subscription data.
 Author(s): Artem Bezborodko
 """
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import asdict
 
@@ -19,7 +20,7 @@ from .models import DomikaSubscriptionCreate, DomikaSubscriptionUpdate, Subscrip
 
 async def get(
     db_session: AsyncSession,
-    app_session_id: str,
+    app_session_id: uuid.UUID,
     *,
     need_push: bool = True,
 ) -> Sequence[Subscription]:
@@ -82,7 +83,7 @@ async def update(
 
 async def update_in_place(
     db_session: AsyncSession,
-    app_session_id: str,
+    app_session_id: uuid.UUID,
     entity_id: str,
     attribute: str,
     subscription_in: DomikaSubscriptionUpdate,
@@ -103,7 +104,7 @@ async def update_in_place(
         await db_session.commit()
 
 
-async def delete(db_session: AsyncSession, app_session_id: str, *, commit: bool = True):
+async def delete(db_session: AsyncSession, app_session_id: uuid.UUID, *, commit: bool = True):
     """Delete subscription."""
     stmt = sqlalchemy.delete(Subscription).where(Subscription.app_session_id == app_session_id)
     await db_session.execute(stmt)

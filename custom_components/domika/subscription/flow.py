@@ -18,12 +18,13 @@ from .service import create, delete, update_in_place
 async def resubscribe(
     db_session: AsyncSession,
     app_session_id: str,
-    subscriptions: dict[str, list[str]],
+    subscriptions: dict[str, set[str]],
 ):
     """Remove all existing subscriptions, and subscribe to the new subscriptions."""
     await delete(db_session, app_session_id, commit=False)
     for entity, attrs in subscriptions.items():
         for attr in attrs:
+            # TODO: create_many
             await create(
                 db_session,
                 DomikaSubscriptionCreate(
@@ -41,7 +42,7 @@ async def resubscribe(
 async def resubscribe_push(
     db_session: AsyncSession,
     app_session_id: str,
-    subscriptions: dict[str, list[str]],
+    subscriptions: dict[str, set[str]],
 ):
     """
     Set need_push for given app_session_id.
@@ -58,6 +59,7 @@ async def resubscribe_push(
     )
     for entity, attrs in subscriptions.items():
         for attr in attrs:
+            # TODO: update_many
             await update_in_place(
                 db_session,
                 app_session_id=app_session_id,

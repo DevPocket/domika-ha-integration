@@ -29,7 +29,7 @@ def upgrade() -> None:
     )
     op.create_table(
         'devices',
-        sa.Column('app_session_id', sa.String(), nullable=False),
+        sa.Column('app_session_id', sa.Uuid(), nullable=False),
         sa.Column('push_session_id', sa.Uuid(), nullable=True),
         sa.Column('push_token', sa.String(), nullable=False),
         sa.Column('platform', sa.String(), nullable=False),

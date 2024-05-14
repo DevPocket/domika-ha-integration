@@ -25,7 +25,7 @@ class Device(AsyncBase):
 
     __tablename__ = 'devices'
 
-    app_session_id: Mapped[str] = mapped_column(primary_key=True)
+    app_session_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     push_session_id: Mapped[uuid.UUID] = mapped_column(default=None, nullable=True)
     push_token: Mapped[str]
     platform: Mapped[str]
@@ -40,7 +40,7 @@ class Device(AsyncBase):
 class DomikaDeviceBase(DataClassJSONMixin):
     """Base application device model."""
 
-    app_session_id: str
+    app_session_id: uuid.UUID
     push_session_id: Optional[uuid.UUID] = field(
         metadata={
             'serialization_strategy': pass_through,
@@ -67,4 +67,8 @@ class DomikaDeviceRead(DomikaDeviceBase):
 class DomikaDeviceUpdate(DataClassJSONMixin):
     """Application device update model."""
 
-    last_update: int
+    push_session_id: uuid.UUID | None = None
+    push_token: str | None = None
+    platform: str | None = None
+    environment: str | None = None
+    last_update: int | None = None

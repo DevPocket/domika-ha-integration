@@ -1,6 +1,6 @@
 # vim: set fileencoding=utf-8
 """
-Critical sensors.
+Critical sensor.
 
 (c) DevPocket, 2024
 

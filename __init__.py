@@ -157,8 +157,8 @@ def forward_event(event):
         for app_session_id in app_session_ids:
             dict_attributes = dict(attributes)
             dict_attributes["entity_id"] = entity_id
-            LOGGER.debug(f"""### domika_state_changed_{app_session_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
-            HASS.bus.async_fire_internal(f"domika_state_changed_{app_session_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
+            LOGGER.debug(f"""### domika_{app_session_id}, {dict_attributes}, {event.origin}, {event.context.id}, {event.time_fired} """)
+            HASS.bus.async_fire_internal(f"domika_{app_session_id}", dict_attributes, event.origin, event.context, event.time_fired.timestamp())
 
 
     if event.event_type == "state_changed":

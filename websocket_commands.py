@@ -82,8 +82,8 @@ def websocket_domika_update_push_token(
         dict_attributes = {"invalid_app_session_id": True}
 
     if dict_attributes:
-        LOGGER.debug(f"""### domika_state_changed_{app_session_id}, {dict_attributes} """)
-        hass.bus.async_fire_internal(f"domika_state_changed_{app_session_id}", dict_attributes)
+        LOGGER.debug(f"""### domika_{app_session_id}, {dict_attributes} """)
+        hass.bus.async_fire_internal(f"domika_{app_session_id}", dict_attributes)
 
 
 @websocket_api.websocket_command(

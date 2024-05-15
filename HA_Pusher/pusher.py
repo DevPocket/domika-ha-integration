@@ -13,7 +13,7 @@ import threading
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
-CURRENT_DB_VERSION: int = 10
+CURRENT_DB_VERSION: int = 11
 
 # TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
@@ -63,6 +63,7 @@ class Pusher:
 
             CREATE TABLE if not exists devices (
                 app_session_id TEXT PRIMARY KEY NOT NULL, 
+                user_id TEXT NOT NULL, 
                 push_session_id TEXT NOT NULL DEFAULT "", 
                 token TEXT NOT NULL, 
                 platform TEXT NOT NULL, 
@@ -131,15 +132,16 @@ class Pusher:
         self.db.close()
 
 
-    def update_app_session_id(self, app_session_id) -> str:
-        push_logger.log_debug(f"update_app_session_id, app_session_id={app_session_id}")
+    def update_app_session_id(self, app_session_id, user_id) -> str:
+        push_logger.log_debug(f"update_app_session_id, app_session_id={app_session_id}, user_id={user_id}")
         with LOCK_ALL:
             # Try to find the proper record. If no app_session_id found — generate a new one.
             res = self.cur.execute("""
                 SELECT app_session_id
                 FROM devices
-                WHERE app_session_id = ?
-                ;""", [app_session_id])
+                WHERE app_session_id = ? AND
+                      user_id = ?
+                ;""", [app_session_id, user_id])
 
             data = res.fetchall()
             if len(data) == 1:
@@ -165,9 +167,9 @@ class Pusher:
 
                 try:
                     self.cur.execute("""
-                        INSERT INTO devices (app_session_id, token, platform, environment, last_update) 
-                        VALUES (?, "", "", "", datetime('now'))
-                        ;""", [new_app_session_id])
+                        INSERT INTO devices (app_session_id, user_id, token, platform, environment, last_update) 
+                        VALUES (?, ?, "", "", "", datetime('now'))
+                        ;""", [new_app_session_id, user_id])
                     self.db.commit()
                     return new_app_session_id
                 except sqlite3.Error as er:
@@ -178,17 +180,18 @@ class Pusher:
     # Returns 1 if success
     # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
     # Returns -1 if app_session_id does not exist
-    def update_push_notification_token(self, app_session_id, token, platform, environment) -> int:
-        push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, token={token}, platform={platform}, environment={environment}")
-        if not token or not platform or not environment:
-            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: token={token}, platform: {platform}, environment: {environment} ")
+    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
+        push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
+        if not user_id or not token or not platform or not environment:
+            push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
         else:
             with LOCK_ALL:
                 res = self.cur.execute("""
                     SELECT app_session_id, push_session_id 
                     FROM devices
-                    WHERE app_session_id = ?
-                    ;""", [app_session_id])
+                    WHERE app_session_id = ? AND
+                          user_id = ?
+                    ;""", [app_session_id, user_id])
 
                 data = res.fetchall()
                 if len(data) == 1:
@@ -517,6 +520,22 @@ class Pusher:
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
         if r.status_code == 422:
             TOKENS_TO_DELETE.add(token)
+
+
+    def app_session_ids_for_user_id(self, user_id) -> list:
+        with LOCK_ALL:
+            if not user_id:
+                push_logger.log_error(f"app_session_ids_for_user_id: user_id is empty: {user_id} ")
+                return []
+            else:
+                db_res = self.cur.execute("""
+                    SELECT app_session_id
+                    FROM devices 
+                    WHERE user_id = ?
+                    ;""", [user_id])
+                res = [item[0] for item in db_res.fetchall()]
+                push_logger.log_debug(f"app_session_ids_for_user_id: res: {res} ")
+                return res
 
 
     def save_dashboards(self, user_id: str, dashboards: str):

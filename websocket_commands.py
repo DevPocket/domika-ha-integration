@@ -31,7 +31,8 @@ def websocket_domika_update_app_session(
     LOGGER.debug(f'Got websocket message "update_app_session", data: {msg}')
     pusher = push.Pusher("")
     app_session_id = pusher.update_app_session_id(
-        msg.get("app_session_id")
+        msg.get("app_session_id"),
+        connection.user.id
     )
     connection.send_result(
         msg.get("id"), {"app_session_id": app_session_id}
@@ -62,6 +63,7 @@ def websocket_domika_update_push_token(
     # Do we need to make it async with callback somehow?
     res = pusher.update_push_notification_token(
         app_session_id,
+        connection.user.id,
         msg.get("push_token_hex"),
         msg.get("platform"),
         msg.get("environment")
@@ -71,15 +73,15 @@ def websocket_domika_update_push_token(
         msg.get("id"), {"result": res}
     )
 
-    dict_attributes = None
+    dict_attributes = {"d.type": "push_activation"}
     if res == 1:
-        dict_attributes = {"push_activation_success": True}
+        dict_attributes["push_activation_success"] = True
     elif res == 2:
         dict_attributes = None
     elif res == 0:
-        dict_attributes = {"push_activation_success": False}
+        dict_attributes["push_activation_success"] = False
     elif res == -1:
-        dict_attributes = {"invalid_app_session_id": True}
+        dict_attributes["invalid_app_session_id"] = True
 
     if dict_attributes:
         LOGGER.debug(f"""### domika_{app_session_id}, {dict_attributes} """)
@@ -375,7 +377,13 @@ def websocket_domika_save_dashboards(
     connection.send_result(
         msg.get("id"), {}
     )
+
+    app_session_ids = pusher.app_session_ids_for_user_id(connection.user.id)
     pusher.close_connection()
+
+    for app_session_id in app_session_ids:
+        LOGGER.debug(f"""### domika_{app_session_id}, dashboard_update """)
+        hass.bus.async_fire_internal(f"domika_{app_session_id}", {"d.type": "dashboard_update"})
 
 
 @websocket_api.websocket_command(

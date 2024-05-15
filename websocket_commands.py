@@ -371,7 +371,7 @@ def websocket_domika_save_dashboards(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_dashboards", user: {connection.user.id}, data: {msg}')
     pusher = push.Pusher("")
-    sensors_data = pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
+    pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
     connection.send_result(
         msg.get("id"), {}
     )

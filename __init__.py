@@ -189,7 +189,7 @@ def forward_event(event):
                     # Fetch current state for all critical binary sensors.
                     sensors_data = get_critical_sensors(HASS)
                     # Fire the event for app to catch.
-                    HASS.bus.async_fire_internal("critical_sensors_changed", sensors_data, event.origin, event.context, event.time_fired.timestamp())
+                    HASS.bus.async_fire_internal("domika_critical_sensors_changed", sensors_data, event.origin, event.context, event.time_fired.timestamp())
 
             # Check if any app_session_ids are subscribed for these attributes.
             # If so, fire the event to those app_session_ids for app to catch.

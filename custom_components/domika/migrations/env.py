@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from custom_components.domika.database.consts import DATABASE_URL
+from custom_components.domika.const import DATABASE_URL
 from custom_components.domika.models import AsyncBase
 
 # this is the Alembic Config object, which provides

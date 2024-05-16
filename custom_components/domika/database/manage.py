@@ -12,7 +12,7 @@ import alembic.command
 from alembic.config import Config
 from sqlalchemy import Connection
 
-from .consts import ALEMBIC_INI_PATH
+from ..const import ALEMBIC_INI_PATH
 from .core import ENGINE
 
 

@@ -8,7 +8,7 @@ Domika integration.
 Author(s): Artem Bezborodko
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncAttrs
@@ -33,3 +33,6 @@ class AsyncBase(DeclarativeBase, AsyncAttrs):
     def dict(self) -> dict[str, Any]:
         """Return a dict representation of a model."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+NOT_SET = Literal['NOT_SET']

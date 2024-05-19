@@ -8,22 +8,21 @@ Application device.
 Author(s): Artem Bezborodko
 """
 
-import uuid
 from dataclasses import dataclass, field
-from typing import Optional
+import uuid
 
 from mashumaro import pass_through
 from mashumaro.mixins.json import DataClassJSONMixin
 from sqlalchemy import func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..models import AsyncBase
+from ..models import NOT_SET, AsyncBase
 
 
 class Device(AsyncBase):
     """Application device."""
 
-    __tablename__ = 'devices'
+    __tablename__ = "devices"
 
     app_session_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     push_session_id: Mapped[uuid.UUID] = mapped_column(default=None, nullable=True)
@@ -31,8 +30,8 @@ class Device(AsyncBase):
     platform: Mapped[str]
     environment: Mapped[str]
     last_update: Mapped[int] = mapped_column(
-        server_default=func.datetime('now'),
-        onupdate=func.datetime('now'),
+        server_default=func.datetime("now"),
+        onupdate=func.datetime("now"),
     )
 
 
@@ -40,10 +39,14 @@ class Device(AsyncBase):
 class DomikaDeviceBase(DataClassJSONMixin):
     """Base application device model."""
 
-    app_session_id: uuid.UUID
-    push_session_id: Optional[uuid.UUID] = field(
+    app_session_id: uuid.UUID = field(
         metadata={
-            'serialization_strategy': pass_through,
+            "serialization_strategy": pass_through,
+        },
+    )
+    push_session_id: uuid.UUID | None = field(
+        metadata={
+            "serialization_strategy": pass_through,
         },
     )
     push_token: str
@@ -67,8 +70,13 @@ class DomikaDeviceRead(DomikaDeviceBase):
 class DomikaDeviceUpdate(DataClassJSONMixin):
     """Application device update model."""
 
-    push_session_id: uuid.UUID | None = None
-    push_token: str | None = None
-    platform: str | None = None
-    environment: str | None = None
-    last_update: int | None = None
+    push_session_id: uuid.UUID | None | NOT_SET = field(
+        default="NOT_SET",
+        metadata={
+            "serialization_strategy": pass_through,
+        },
+    )
+    push_token: str | NOT_SET = "NOT_SET"
+    platform: str | NOT_SET = "NOT_SET"
+    environment: str | NOT_SET = "NOT_SET"
+    last_update: int | NOT_SET = "NOT_SET"

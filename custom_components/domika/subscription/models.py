@@ -8,9 +8,10 @@ Subscription data.
 Author(s): Artem Bezborodko
 """
 
+from dataclasses import dataclass, field
 import uuid
-from dataclasses import dataclass
 
+from mashumaro import pass_through
 from mashumaro.mixins.json import DataClassJSONMixin
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,10 +22,10 @@ from ..models import AsyncBase
 class Subscription(AsyncBase):
     """Event subscriptions."""
 
-    __tablename__ = 'subscriptions'
+    __tablename__ = "subscriptions"
 
     app_session_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey('devices.app_session_id', ondelete='CASCADE', onupdate='CASCADE'),
+        ForeignKey("devices.app_session_id", ondelete="CASCADE", onupdate="CASCADE"),
         primary_key=True,
     )
     entity_id: Mapped[str] = mapped_column(primary_key=True)
@@ -36,7 +37,11 @@ class Subscription(AsyncBase):
 class DomikaSubscriptionBase(DataClassJSONMixin):
     """Base subscription model."""
 
-    app_session_id: uuid.UUID
+    app_session_id: uuid.UUID = field(
+        metadata={
+            "serialization_strategy": pass_through,
+        },
+    )
     entity_id: str
     attribute: str
     need_push: bool

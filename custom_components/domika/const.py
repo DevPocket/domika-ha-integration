@@ -1,6 +1,7 @@
 """Domika Constants."""
 
 import logging
+import os
 from datetime import timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
@@ -10,8 +11,14 @@ LOGGER = logging.getLogger(__name__)
 DOMAIN = 'Domika'
 MAIN_LOGGER_NAME = DOMAIN
 
-DATABASE_URL = 'sqlite+aiosqlite:///Domika.db'
 ALEMBIC_INI_PATH = 'config/custom_components/domika/alembic.ini'
+
+if os.getenv('DOMIKA_DEBUG') == '1':
+    DATABASE_URL = os.getenv('DOMIKA_DATABASE_URL')
+    PUSH_SERVER_URL = os.getenv('DOMIKA_PUSH_SERVER_URL')
+else:
+    DATABASE_URL = 'sqlite+aiosqlite:///Domika.db'
+    PUSH_SERVER_URL = 'https://domika.app'
 
 # Event confirmation records will stay at least 15 seconds
 EVENT_CONFIRMATION_EXPIRATION_TIME = 15 * 1e6

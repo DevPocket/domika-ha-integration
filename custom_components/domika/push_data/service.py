@@ -10,7 +10,6 @@ Author(s): Artem Bezborodko
 
 import uuid
 from collections.abc import Sequence
-from dataclasses import asdict
 
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
@@ -142,7 +141,8 @@ async def update(
 ):
     """Update push data."""
     push_data_attrs = push_data.dict()
-    update_data = asdict(push_data_in)
+    update_data = push_data_in.to_dict(omit_default=True)
+
     for attr in push_data_attrs:
         if attr in update_data:
             setattr(push_data, attr, update_data[attr])

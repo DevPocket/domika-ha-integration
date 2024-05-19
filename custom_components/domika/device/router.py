@@ -95,9 +95,9 @@ async def websocket_domika_update_push_token(
 
     # This method involves http request. We need to assume it may take quite some time.
     # Do we need to make it async with callback somehow?
-    result: dict[str, Any] | None = None
+    event_result: dict[str, Any] | None = None
 
-    res = -1
+    result = -1
     async with AsyncSessionFactory() as session:
         try:
             if await need_update_push_token(
@@ -110,16 +110,16 @@ async def websocket_domika_update_push_token(
                     app_session_id,
                     cast(str, msg.get('push_token_hex')),
                 )
-                res = 2
+                result = 2
             else:
-                res = 1
-                result = {
+                result = 1
+                event_result = {
                     'd.type': 'push_activation',
                     'push_activation_success': True,
                 }
         except errors.AppSessionIdNotFoundError:
-            res = -1
-            result = {
+            result = -1
+            event_result = {
                 'd.type': 'push_activation',
                 'invalid_app_session_id': True,
             }
@@ -128,17 +128,17 @@ async def websocket_domika_update_push_token(
             push_server_errors.UnexpectedServerResponseError,
             push_server_errors.BadRequestError,
         ):
-            res = 0
-            result = {
+            result = 0
+            event_result = {
                 'd.type': 'push_activation',
                 'push_activation_success': False,
             }
 
-    if result:
-        LOGGER.debug('### domika_%s, %s', app_session_id, result)
-        hass.bus.async_fire(f'domika_{app_session_id}', result)
+    if event_result:
+        LOGGER.debug('### domika_%s, %s', app_session_id, event_result)
+        hass.bus.async_fire(f'domika_{app_session_id}', event_result)
 
-    connection.send_result(msg_id, {'result': res})
+    connection.send_result(msg_id, {'result': result})
 
 
 async def _remove_push_session(app_session_id: uuid.UUID) -> dict:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+
+import requests
 from homeassistant.helpers import (
     config_validation as cv,
     entity_registry as er,
@@ -73,3 +75,7 @@ def get_critical_sensors(hass) -> dict:
 
     res = {"sensors": sensors_list, "sensors_on": sensors_on_list}
     return res
+
+
+def make_post_request(url, json_payload):
+    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})

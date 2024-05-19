@@ -8,8 +8,8 @@ import sys
 from uuid import uuid4
 import json
 import requests
-
 import threading
+
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
 
@@ -180,7 +180,7 @@ class Pusher:
     # Returns 1 if success
     # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
     # Returns -1 if app_session_id does not exist
-    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
+    async def update_push_notification_token(self, app_session_id, user_id, token, platform, environment, hass=None) -> int:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or not token or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
@@ -197,9 +197,14 @@ class Pusher:
                 if len(data) == 1:
                     push_session_id = data[0][1]
                     if push_session_id:
-                        r = requests.post('https://domika.app/check_push_session',
-                                          json={"environment": environment, "token": token, "push_session_id": push_session_id,
-                                                "platform": IOS_PLATFORM})
+                        payload = {"environment": environment, "token": token, "push_session_id": push_session_id, "platform": IOS_PLATFORM}
+                        if not hass:
+                            r = requests.post('https://domika.app/check_push_session',
+                                              json=payload)
+                        else:
+                            r = await hass.async_add_executor_job(make_post_request,
+                                                                  "https://domika.app/update_push_session",
+                                                                  payload)
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
                         if r.text == "1":
                             # We don't want to store token in the integration in the future,
@@ -451,7 +456,7 @@ class Pusher:
             ;""", [DEVICE_EXPIRATION_TIME])
         self.db.commit()
 
-    def generate_push_notifications_ios(self):
+    async def generate_push_notifications_ios(self, hass):
         push_logger.log_debug(f"generate_push_notifications_ios")
         with LOCK_ALL:
             try:
@@ -485,7 +490,7 @@ class Pusher:
 
                     # New token or too long — send push with data
                     if current_token != row["token"] or len(data) > 2000:
-                        self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
+                        await self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}", hass)
                         data = ""
                         current_token = row["token"]
                         current_environment = row["environment"]
@@ -504,20 +509,23 @@ class Pusher:
                     # Add current attribute to data
                     data += f'"{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},'
                 if len(data) > 0:
-                    self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
+                    await self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}", hass)
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    def send_notification_ios(self, push_session_id, environment, token, data, local=False):
+    async def send_notification_ios(self, push_session_id, environment, token, data, hass=None):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
-        if not local:
-            r = requests.post('https://domika.app/send_notification',
-                          json={"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
+        url = 'https://domika.app/send_notification'
+        #     url = 'http://127.0.0.1:5000/send_notification'
+
+        payload = {"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM}
+        if not hass:
+            r = requests.post(url, json=payload)
         else:
-            r = requests.post('http://127.0.0.1:5000/send_notification',
-                          json={"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM})
+            r = await hass.async_add_executor_job(make_post_request, url, payload)
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
+
         if r.status_code == 422:
             TOKENS_TO_DELETE.add(token)
 
@@ -583,3 +591,7 @@ class Pusher:
                           event_id = ?
                 ;""", data)
                 self.db.commit()
+
+
+def make_post_request(url, json_payload):
+    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})

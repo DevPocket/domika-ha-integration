@@ -66,7 +66,8 @@ def websocket_domika_update_push_token(
         connection.user.id,
         msg.get("push_token_hex"),
         msg.get("platform"),
-        msg.get("environment")
+        msg.get("environment"),
+        hass
     )
     pusher.close_connection()
     connection.send_result(
@@ -112,9 +113,6 @@ async def websocket_domika_remove_app_session(
         msg.get("id"), await remove_push_session(hass, msg.get("app_session_id"))
     )
 
-
-def make_post_request(url, json_payload):
-    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})
 
 
 @websocket_api.websocket_command(

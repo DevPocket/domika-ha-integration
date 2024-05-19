@@ -22,9 +22,10 @@ from homeassistant.helpers.typing import ConfigType
 
 from . import websocket_commands as wsc
 from .const import DOMAIN, MAIN_LOGGER_NAME, SENSORS_DEVICE_CLASSES, UPDATE_INTERVAL
-from .critical_sensors import router as critical_sensor_router
+from .critical_sensor import router as critical_sensor_router
 from .dashboard import router as dashboard_router
 from .database.manage import migrate
+from .device import router as device_router
 from .functions import (
     event_data_to_dict,
     get_critical_sensors,
@@ -32,6 +33,8 @@ from .functions import (
     make_dictionary,
 )
 from .HA_Pusher.pusher import Pusher
+from .push_data import router as push_data_router
+from .subscription import router as subscrioption_router
 
 # Importing database models to fill sqlalchemy metadata.
 # isort: off
@@ -101,15 +104,18 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     hass.http.register_view(DomikaAPIPushStatesWithDelay)
 
     # Set up the Domika WebSocket commands
-    websocket_api.async_register_command(hass, wsc.websocket_domika_update_app_session)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_update_push_token)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_remove_app_session)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_update_push_session)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_verify_push_session)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_remove_push_session)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_resubscribe)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_resubscribe_push)
-    websocket_api.async_register_command(hass, wsc.websocket_domika_confirm_event)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_update_app_session)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_remove_app_session)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_update_push_token)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_update_push_session)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_verify_push_session)
+    websocket_api.async_register_command(hass, device_router.websocket_domika_remove_push_session)
+    websocket_api.async_register_command(hass, subscrioption_router.websocket_domika_resubscribe)
+    websocket_api.async_register_command(
+        hass,
+        subscrioption_router.websocket_domika_resubscribe_push,
+    )
+    websocket_api.async_register_command(hass, push_data_router.websocket_domika_confirm_events)
     websocket_api.async_register_command(
         hass,
         critical_sensor_router.websocket_domika_critical_sensors,
@@ -235,11 +241,11 @@ def forward_event(event: Event):
             dict_attributes = dict(attributes)
             dict_attributes['entity_id'] = entity_id
             LOGGER.debug(
-                f'### domika_state_changed_{app_session_id}, {dict_attributes}, {event.origin}, '
+                f'### domika_{app_session_id}, {dict_attributes}, {event.origin}, '
                 f'{event.context.id}, {event.time_fired}',
             )
             HASS.bus.async_fire(
-                f'domika_state_changed_{app_session_id}',
+                f'domika_{app_session_id}',
                 dict_attributes,
                 event.origin,
                 event.context,

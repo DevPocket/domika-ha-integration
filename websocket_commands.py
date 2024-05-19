@@ -114,7 +114,7 @@ async def websocket_domika_remove_app_session(
 
 
 def make_post_request(url, json_payload):
-    return requests.post(url, json_payload)
+    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})
 
 
 @websocket_api.websocket_command(
@@ -147,10 +147,10 @@ async def websocket_domika_update_push_session(
                         "platform": platform,
                         "environment": environment}
         r = await hass.async_add_executor_job(make_post_request, "https://domika.app/update_push_session", json_payload)
-        # LOGGER.log_debug(f"update_push_session result: {r.text}, {r.status_code}")
+        LOGGER.debug(f"update_push_session result: {r.text}, {r.status_code}")
 
         connection.send_result(
-            msg.get("id"), {"result": 1, "text": "ok"}
+            msg.get("id"), {"result": 1, "text": f"{r.text}, {r.status_code}"}
         )
     else:
         connection.send_result(

@@ -510,7 +510,7 @@ class Pusher:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    async def send_notification_ios(self, push_session_id, environment, token, data, local=False):
+    def send_notification_ios(self, push_session_id, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
         if not local:
             url = 'https://domika.app/send_notification'

@@ -26,9 +26,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    def generate_push_notifications_ios(time):
+    async def generate_push_notifications_ios(time):
         pusher = push.Pusher("")
-        pusher.generate_push_notifications_ios(hass)
+        # pusher.generate_push_notifications_ios(hass)
+        await hass.async_add_executor_job(pusher.generate_push_notifications_ios)
         pusher.close_connection()
 
     hass.http.register_view(DomikaAPIDomainServicesView)

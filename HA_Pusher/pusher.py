@@ -452,7 +452,7 @@ class Pusher:
             ;""", [DEVICE_EXPIRATION_TIME])
         self.db.commit()
 
-    async def generate_push_notifications_ios(self, hass):
+    def generate_push_notifications_ios(self):
         push_logger.log_debug(f"generate_push_notifications_ios")
         with LOCK_ALL:
             try:
@@ -486,7 +486,7 @@ class Pusher:
 
                     # New token or too long — send push with data
                     if current_token != row["token"] or len(data) > 2000:
-                        await self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}", hass)
+                        self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
                         data = ""
                         current_token = row["token"]
                         current_environment = row["environment"]
@@ -505,21 +505,20 @@ class Pusher:
                     # Add current attribute to data
                     data += f'"{row["attribute"]}":{{"v":"{row["value"]}","t":{row["timestamp"]}}},'
                 if len(data) > 0:
-                    await self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}", hass)
+                    self.send_notification_ios(current_push_session_id, current_environment, current_token, "{" + data[:-1] + "}}")
             except sqlite3.Error as er:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    async def send_notification_ios(self, push_session_id, environment, token, data, hass=None):
+    async def send_notification_ios(self, push_session_id, environment, token, data, local=False):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
-        url = 'https://domika.app/send_notification'
-        #     url = 'http://127.0.0.1:5000/send_notification'
+        if not local:
+            url = 'https://domika.app/send_notification'
+        else:
+            url = 'http://127.0.0.1:5000/send_notification'
 
         payload = {"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM}
-        if not hass:
-            r = requests.post(url, json=payload)
-        else:
-            r = await hass.async_add_executor_job(make_post_request, url, payload)
+        r = requests.post(url, json=payload)
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
 
         if r.status_code == 422:

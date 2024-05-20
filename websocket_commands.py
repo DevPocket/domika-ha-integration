@@ -79,10 +79,11 @@ async def websocket_domika_update_push_token(
     if res == 1:
         dict_attributes["push_activation_success"] = True
     elif res == 2:
-        dict_attributes = None
+        dict_attributes["push_activation_success"] = False
     elif res == 0:
         dict_attributes["push_activation_success"] = False
     elif res == -1:
+        dict_attributes["push_activation_success"] = False
         dict_attributes["invalid_app_session_id"] = True
 
     if dict_attributes:

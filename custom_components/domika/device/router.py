@@ -66,6 +66,11 @@ async def websocket_domika_update_app_session(
         app_session_id = await update_app_session_id(session, app_session_id)
 
     connection.send_result(msg_id, {'app_session_id': app_session_id})
+    LOGGER.debug(
+        'update_app_session msg_id=%s data=%s',
+        msg_id,
+        {'app_session_id': app_session_id},
+    )
 
 
 @websocket_command(
@@ -139,6 +144,7 @@ async def websocket_domika_update_push_token(
         hass.bus.async_fire(f'domika_{app_session_id}', event_result)
 
     connection.send_result(msg_id, {'result': result})
+    LOGGER.debug('update_push_token msg_id=%s data=%s', msg_id, {'result': result})
 
 
 async def _remove_push_session(app_session_id: uuid.UUID) -> dict:
@@ -198,7 +204,9 @@ async def websocket_domika_remove_push_session(
 
     LOGGER.debug('Got websocket message "remove_push_session", data: %s', msg)
     app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
-    connection.send_result(msg_id, _remove_push_session(app_session_id))
+    result = await _remove_push_session(app_session_id)
+    connection.send_result(msg_id, result)
+    LOGGER.debug('remove_push_session msg_id=%s data=%s', msg_id, result)
 
 
 @websocket_command(
@@ -228,9 +236,9 @@ async def websocket_domika_update_push_session(
     try:
         await create_push_session(
             cast(str, msg.get('original_transaction_id')),
-            cast(str, msg.get('push_token_hex')),
             cast(str, msg.get('platform')),
             cast(str, msg.get('environment')),
+            cast(str, msg.get('push_token_hex')),
         )
         result = {
             'result': 1,
@@ -253,6 +261,7 @@ async def websocket_domika_update_push_session(
         }
 
     connection.send_result(msg_id, result)
+    LOGGER.debug('update_push_session msg_id=%s data=%s', msg_id, result)
 
 
 @websocket_command(
@@ -279,7 +288,9 @@ async def websocket_domika_remove_app_session(
     async with AsyncSessionFactory() as session:
         await delete(session, app_session_id)
 
-    connection.send_result(msg_id, await _remove_push_session(app_session_id))
+    result = await _remove_push_session(app_session_id)
+    connection.send_result(msg_id, result)
+    LOGGER.debug('remove_app_session msg_id=%s data=%s', msg_id, result)
 
 
 @websocket_command(
@@ -342,3 +353,4 @@ async def websocket_domika_verify_push_session(
         }
 
     connection.send_result(msg_id, result)
+    LOGGER.debug('verify_push_session msg_id=%s data=%s', msg_id, result)

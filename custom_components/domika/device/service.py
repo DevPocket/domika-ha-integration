@@ -49,7 +49,7 @@ async def update(
 ) -> Device:
     """Update device model."""
     device_data = device.dict()
-    update_data = device_in.to_dict(omit_default=True)
+    update_data = device_in.to_dict()
 
     for field in device_data:
         if field in update_data:

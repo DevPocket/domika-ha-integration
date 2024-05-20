@@ -8,10 +8,11 @@ Application device.
 Author(s): Artem Bezborodko
 """
 
-from dataclasses import dataclass, field
 import uuid
+from dataclasses import dataclass, field
 
 from mashumaro import pass_through
+from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from sqlalchemy import func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,7 +23,7 @@ from ..models import NOT_SET, AsyncBase
 class Device(AsyncBase):
     """Application device."""
 
-    __tablename__ = "devices"
+    __tablename__ = 'devices'
 
     app_session_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     push_session_id: Mapped[uuid.UUID] = mapped_column(default=None, nullable=True)
@@ -30,8 +31,8 @@ class Device(AsyncBase):
     platform: Mapped[str]
     environment: Mapped[str]
     last_update: Mapped[int] = mapped_column(
-        server_default=func.datetime("now"),
-        onupdate=func.datetime("now"),
+        server_default=func.datetime('now'),
+        onupdate=func.datetime('now'),
     )
 
 
@@ -41,12 +42,12 @@ class DomikaDeviceBase(DataClassJSONMixin):
 
     app_session_id: uuid.UUID = field(
         metadata={
-            "serialization_strategy": pass_through,
+            'serialization_strategy': pass_through,
         },
     )
     push_session_id: uuid.UUID | None = field(
         metadata={
-            "serialization_strategy": pass_through,
+            'serialization_strategy': pass_through,
         },
     )
     push_token: str
@@ -71,12 +72,17 @@ class DomikaDeviceUpdate(DataClassJSONMixin):
     """Application device update model."""
 
     push_session_id: uuid.UUID | None | NOT_SET = field(
-        default="NOT_SET",
+        default='NOT_SET',
         metadata={
-            "serialization_strategy": pass_through,
+            'serialization_strategy': pass_through,
         },
     )
-    push_token: str | NOT_SET = "NOT_SET"
-    platform: str | NOT_SET = "NOT_SET"
-    environment: str | NOT_SET = "NOT_SET"
-    last_update: int | NOT_SET = "NOT_SET"
+    push_token: str | NOT_SET = 'NOT_SET'
+    platform: str | NOT_SET = 'NOT_SET'
+    environment: str | NOT_SET = 'NOT_SET'
+    last_update: int | NOT_SET = 'NOT_SET'
+
+    class Config(BaseConfig):
+        """Mashumaro config."""
+
+        omit_default = True

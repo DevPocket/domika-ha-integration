@@ -40,15 +40,14 @@ def websocket_domika_update_app_session(
     pusher.close_connection()
 
 
-async def job_update_push_notification_token(app_session_id, user_id, push_token_hex, platform, environment, hass):
+def job_update_push_notification_token(app_session_id, user_id, push_token_hex, platform, environment, hass):
     pusher = push.Pusher("")
-    res = await pusher.update_push_notification_token(
+    res = pusher.update_push_notification_token(
         app_session_id,
         user_id,
         push_token_hex,
         platform,
-        environment,
-        hass
+        environment
     )
     pusher.close_connection()
     return res

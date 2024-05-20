@@ -62,13 +62,13 @@ async def websocket_domika_update_push_token(
     app_session_id = msg.get("app_session_id")
     # This method involves http request. We need to assume it may take quite some time.
     # Do we need to make it async with callback somehow?
-    res = await pusher.update_push_notification_token(
-        app_session_id,
+    res = hass.async_add_executor_job(
+        pusher.update_push_notification_token,
+ app_session_id,
         connection.user.id,
         msg.get("push_token_hex"),
         msg.get("platform"),
-        msg.get("environment"),
-        hass
+        msg.get("environment")
     )
     pusher.close_connection()
     connection.send_result(
@@ -85,6 +85,9 @@ async def websocket_domika_update_push_token(
     elif res == -1:
         dict_attributes["push_activation_success"] = False
         dict_attributes["invalid_app_session_id"] = True
+    else:
+        dict_attributes["push_activation_success"] = False
+        dict_attributes["something_went_wrong"] = True
 
     if dict_attributes:
         LOGGER.debug(f"""### domika_{app_session_id}, {dict_attributes} """)

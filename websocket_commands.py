@@ -49,8 +49,9 @@ def websocket_domika_update_app_session(
         vol.Required("environment"): str,
     }
 )
-@callback
-def websocket_domika_update_push_token(
+# @callback
+@websocket_api.async_response
+async def websocket_domika_update_push_token(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
@@ -61,7 +62,7 @@ def websocket_domika_update_push_token(
     app_session_id = msg.get("app_session_id")
     # This method involves http request. We need to assume it may take quite some time.
     # Do we need to make it async with callback somehow?
-    res = pusher.update_push_notification_token(
+    res = await pusher.update_push_notification_token(
         app_session_id,
         connection.user.id,
         msg.get("push_token_hex"),

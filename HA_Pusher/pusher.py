@@ -180,7 +180,7 @@ class Pusher:
     # Returns 1 if success
     # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
     # Returns -1 if app_session_id does not exist
-    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
+    async def update_push_notification_token(self, app_session_id, user_id, token, platform, environment, hass=None) -> int:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or not token or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
@@ -198,8 +198,12 @@ class Pusher:
                     push_session_id = data[0][1]
                     if push_session_id:
                         payload = {"environment": environment, "token": token, "push_session_id": push_session_id, "platform": IOS_PLATFORM}
-                        r = requests.post('https://domika.app/check_push_session',
-                                          json=payload)
+                        url = 'https://domika.app/check_push_session'
+                        if not hass:
+                            r = requests.post(url, json=payload)
+                        else:
+                            r = await hass.async_add_executor_job(make_post_request, url, payload)
+
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
                         if r.text == "1":
                             # We don't want to store token in the integration in the future,

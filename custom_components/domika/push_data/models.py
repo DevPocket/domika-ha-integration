@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from mashumaro import pass_through
+from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -83,3 +84,8 @@ class DomikaPushDataUpdate(DataClassJSONMixin):
 
     value: Optional[str]
     timestamp: Optional[int]
+
+    class Config(BaseConfig):
+        """Mashumaro config."""
+
+        omit_default = True

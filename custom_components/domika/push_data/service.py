@@ -141,7 +141,7 @@ async def update(
 ):
     """Update push data."""
     push_data_attrs = push_data.dict()
-    update_data = push_data_in.to_dict(omit_default=True)
+    update_data = push_data_in.to_dict()
 
     for attr in push_data_attrs:
         if attr in update_data:

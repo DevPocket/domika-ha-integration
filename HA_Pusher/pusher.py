@@ -586,7 +586,3 @@ class Pusher:
                           event_id = ?
                 ;""", data)
                 self.db.commit()
-
-
-def make_post_request(url, json_payload):
-    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})

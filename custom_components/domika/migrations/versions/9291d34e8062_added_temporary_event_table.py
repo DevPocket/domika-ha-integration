@@ -34,7 +34,7 @@ def upgrade() -> None:
             server_default=sa.text("(datetime('now'))"),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint('event_id', name=op.f('pk_events')),
+        sa.PrimaryKeyConstraint('event_id', 'entity_id', 'attribute', name=op.f('pk_events')),
     )
     # ### end Alembic commands ###
 

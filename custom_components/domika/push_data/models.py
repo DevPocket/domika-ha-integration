@@ -44,8 +44,8 @@ class _Event(AsyncBase):
     __tablename__ = 'events'
 
     event_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
-    entity_id: Mapped[str]
-    attribute: Mapped[str]
+    entity_id: Mapped[str] = mapped_column(primary_key=True)
+    attribute: Mapped[str] = mapped_column(primary_key=True)
     value: Mapped[str]
     context_id: Mapped[str]
     timestamp: Mapped[int] = mapped_column(server_default=func.datetime('now'))

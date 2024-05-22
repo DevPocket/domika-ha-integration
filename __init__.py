@@ -46,7 +46,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_domika_resubscribe_push)
     websocket_api.async_register_command(hass, websocket_domika_confirm_events)
     websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
-    websocket_api.async_register_command(hass, websocket_domika_save_dashboards)
+    websocket_api.async_register_command(hass, websocket_domika_update_dashboards)
     websocket_api.async_register_command(hass, websocket_domika_get_dashboards)
     websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     event.async_track_time_interval(hass, generate_push_notifications_ios, UPDATE_INTERVAL, cancel_on_shutdown=True)

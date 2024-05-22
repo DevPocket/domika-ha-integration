@@ -12,10 +12,8 @@ import threading
 
 LOCK_ALL = threading.Lock()
 TOKENS_TO_DELETE = set()
+CURRENT_DB_VERSION: int = 12
 
-CURRENT_DB_VERSION: int = 11
-
-# TBD: How to subscribe to certain events for all installations? Right now it's impossible, as app_session_id works as a PK
 
 class Pusher:
     db = None
@@ -58,7 +56,8 @@ class Pusher:
         self.cur.executescript("""
             CREATE TABLE if not exists dashboards (
                 user_id TEXT PRIMARY KEY NOT NULL, 
-                dashboards TEXT NOT NULL 
+                dashboards TEXT NOT NULL,
+                hash TEXT NOT NULL
                 ); 
 
             CREATE TABLE if not exists devices (
@@ -541,34 +540,34 @@ class Pusher:
                 return res
 
 
-    def save_dashboards(self, user_id: str, dashboards: str):
+    def save_dashboards(self, user_id: str, dashboards: str, hash: str):
         with LOCK_ALL:
-            if not user_id or not dashboards:
-                push_logger.log_error(f"save_dashboards: one of the fields is empty, no record was updated: user_id: {user_id}, dashboards={dashboards} ")
+            if not user_id or not dashboards or not hash:
+                push_logger.log_error(f"save_dashboards: one of the fields is empty, no record was updated: user_id={user_id}, dashboards={dashboards}, hash={hash} ")
             else:
                 self.cur.execute("""
-                    INSERT INTO dashboards (user_id, dashboards) 
-                    VALUES (?, ?)
+                    INSERT INTO dashboards (user_id, dashboards, hash) 
+                    VALUES (?, ?, ?)
                     ON CONFLICT(user_id) DO UPDATE SET
                         dashboards = excluded.dashboards
-                    ;""", [user_id, dashboards])
+                    ;""", [user_id, dashboards, hash])
                 self.db.commit()
 
-    def get_dashboards(self, user_id: str) -> str:
+    def get_dashboards(self, user_id: str) -> dict:
         with LOCK_ALL:
             if not user_id:
                 push_logger.log_error(f"get_dashboards: one of the fields is empty, no record was updated: user_id: {user_id} ")
             else:
                 db_res = self.cur.execute("""
-                    SELECT dashboards 
+                    SELECT dashboards, hash 
                     FROM dashboards 
                     WHERE user_id = ?
                     ;""", [user_id])
                 res = list(db_res.fetchall())
                 if len(res) == 1:
-                    return res[0][0]
+                    return {"dashboards": res[0]['dashboards'], "hash": res[0]['hash']}
                 else:
-                    return ""
+                    return {}
 
     def confirm_events(self, app_session_id: str, event_ids: list[str]):
         with LOCK_ALL:

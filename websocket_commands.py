@@ -371,10 +371,11 @@ def websocket_domika_critical_sensors(
     {
         vol.Required("type"): "domika/update_dashboards",
         vol.Required("dashboards"): str,
+        vol.Required("hash"): str,
     }
 )
 @callback
-def websocket_domika_save_dashboards(
+def websocket_domika_update_dashboards(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
@@ -382,7 +383,9 @@ def websocket_domika_save_dashboards(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_dashboards", user: {connection.user.id}, data: {msg}')
     pusher = push.Pusher("")
-    pusher.save_dashboards(connection.user.id, msg.get("dashboards"))
+    dash_hash = msg.get("hash")
+    dashboards = msg.get("dashboards")
+    pusher.save_dashboards(connection.user.id, dashboards, dash_hash)
     connection.send_result(
         msg.get("id"), {}
     )
@@ -392,7 +395,7 @@ def websocket_domika_save_dashboards(
 
     for app_session_id in app_session_ids:
         LOGGER.debug(f"""### domika_{app_session_id}, dashboard_update """)
-        hass.bus.async_fire_internal(f"domika_{app_session_id}", {"d.type": "dashboard_update"})
+        hass.bus.async_fire_internal(f"domika_{app_session_id}", {"d.type": "dashboard_update", "hash": dash_hash})
 
 
 @websocket_api.websocket_command(
@@ -409,8 +412,8 @@ def websocket_domika_get_dashboards(
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "get_dashboards", user: {connection.user.id}, data: {msg}')
     pusher = push.Pusher("")
-    dashboards = pusher.get_dashboards(connection.user.id)
+    dashboards_dict = pusher.get_dashboards(connection.user.id)
     connection.send_result(
-        msg.get("id"), {"dashboards": dashboards}
+        msg.get("id"), dashboards_dict
     )
     pusher.close_connection()

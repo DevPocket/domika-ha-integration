@@ -33,19 +33,7 @@ async def get(
         Subscription.app_session_id == app_session_id,
         Subscription.need_push == need_push,
     )
-    return (await db_session.scalars(stmt)).all()
-
-
-async def get_by_attributes(
-    db_session: AsyncSession,
-    entity_id: str,
-    attributes: list[str],
-) -> Sequence[Subscription]:
-    """Get all subscriptions with given entity_id that contains attribute from attributes."""
-    stmt = sqlalchemy.select(Subscription).where(
-        Subscription.entity_id == entity_id,
-        Subscription.attribute.in_(attributes),
-    )
+    stmt = stmt.order_by(Subscription.entity_id)
     return (await db_session.scalars(stmt)).all()
 
 

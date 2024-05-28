@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
+from ..device import service as device_service
 from .models import DomikaDashboardCreate, DomikaDashboardRead
 from .service import create_or_update, get
 
@@ -33,7 +34,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 )
 @async_response
 async def websocket_domika_update_dashboards(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -58,6 +59,18 @@ async def websocket_domika_update_dashboards(
                 hash=hash_,
                 user_id=connection.user.id,
             ),
+        )
+
+        devices = await device_service.get_by_user_id(session, connection.user.id)
+
+    for device in devices:
+        LOGGER.debug('### domika_%s, dashboard_update', device.app_session_id)
+        hass.bus.async_fire(
+            f'domika_{device.app_session_id}',
+            {
+                'd.type': 'dashboard_update',
+                'hash': hash_,
+            },
         )
 
     connection.send_result(

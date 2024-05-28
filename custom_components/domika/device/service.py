@@ -9,6 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import uuid
+from typing import Sequence
 
 import sqlalchemy
 from sqlalchemy import select
@@ -21,6 +22,12 @@ async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | N
     """Get device by application sesison id."""
     stmt = select(Device).where(Device.app_session_id == app_session_id)
     return await db_session.scalar(stmt)
+
+
+async def get_by_user_id(db_session: AsyncSession, user_id: str) -> Sequence[Device]:
+    """Get device by user id."""
+    stmt = select(Device).where(Device.user_id == user_id)
+    return (await db_session.scalars(stmt)).all()
 
 
 async def create(

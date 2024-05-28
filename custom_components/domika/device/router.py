@@ -63,7 +63,7 @@ async def websocket_domika_update_app_session(
         app_session_id = uuid.UUID(msg.get('app_session_id'))
 
     async with AsyncSessionFactory() as session:
-        app_session_id = await update_app_session_id(session, app_session_id)
+        app_session_id = await update_app_session_id(session, app_session_id, connection.user.id)
 
     connection.send_result(msg_id, {'app_session_id': app_session_id})
     LOGGER.debug(

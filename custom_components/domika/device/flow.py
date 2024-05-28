@@ -19,12 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import errors, push_server_errors, statuses
 from ..const import PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
-from .service import create, get, update, update_in_place
+from .service import create, get, update
 
 
 async def update_app_session_id(
     db_session: AsyncSession,
     app_session_id: uuid.UUID | None,
+    user_id: str,
 ) -> uuid.UUID:
     """
     Update or create app session id.
@@ -35,6 +36,7 @@ async def update_app_session_id(
     Args:
         db_session: sqlalchemy session.
         app_session_id: Application session id.
+        user_id: homeassistant user id.
 
     Returns:
         If the session exists - returns app_session_id. Otherwise returns newly created session id.
@@ -60,6 +62,7 @@ async def update_app_session_id(
             db_session,
             DomikaDeviceCreate(
                 app_session_id=uuid.uuid4(),
+                user_id=user_id,
                 push_session_id=None,
                 push_token='',
                 platform='',

@@ -27,7 +27,7 @@ async def create_or_update(
     *,
     commit: bool = True,
 ) -> Dashboard | None:
-    """Create new dashboard."""
+    """Create or update dashboard."""
     stmt = sqlite_dialect.insert(Dashboard)
     stmt = stmt.values(**dashboard_in.to_dict())
     stmt = stmt.on_conflict_do_update(

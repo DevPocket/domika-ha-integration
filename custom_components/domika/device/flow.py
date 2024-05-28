@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import errors, push_server_errors, statuses
 from ..const import PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
-from .service import create, get, update
+from .service import create, get, update, update_in_place
 
 
 async def update_app_session_id(
@@ -104,7 +104,7 @@ async def need_update_push_token(
     if device.push_session_id:
         headers = {
             # TODO: rename to x-push-session-id
-            'x-session-id': device.push_session_id,
+            'x-session-id': str(device.push_session_id),
         }
 
     async with (
@@ -122,7 +122,7 @@ async def need_update_push_token(
             return False
 
         if resp.status == statuses.HTTP_409_CONFLICT:
-            # Current push token conflicts with given one.
+            # Current push token conflicts with the given one.
             return True
 
         if resp.status == statuses.HTTP_400_BAD_REQUEST:
@@ -138,6 +138,8 @@ async def update_push_token(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     push_token: str,
+    platform: str,
+    environment: str,
 ) -> None:
     """
     Start push token update flow.
@@ -146,6 +148,8 @@ async def update_push_token(
         db_session: sqlalchemy session.
         app_session_id: application session id.
         push_token: device push token.
+        platform: application platform,
+        environment: application environment,
 
     Raises:
         errors.AppSessionIdNotFoundError: if app session not found.
@@ -159,6 +163,16 @@ async def update_push_token(
     if not device:
         raise errors.AppSessionIdNotFoundError(app_session_id)
 
+    await update(
+        db_session,
+        device,
+        DomikaDeviceUpdate(
+            push_token=push_token,
+            platform=platform,
+            environment=environment,
+        ),
+    )
+
     async with (
         aiohttp.ClientSession(json_serialize=json.dumps) as session,
         session.post(
@@ -168,7 +182,7 @@ async def update_push_token(
             },
             headers={
                 # TODO: rename to x-push-session-id
-                'x-session-id': device.push_session_id,
+                'x-session-id': str(device.push_session_id),
             },
         ) as resp,
     ):
@@ -218,7 +232,7 @@ async def remove_push_session(
             f'{PUSH_SERVER_URL}/push_session/remove',
             headers={
                 # TODO: rename to x-push-session-id
-                'x-session-id': device.push_session_id,
+                'x-session-id': str(device.push_session_id),
             },
         ) as resp,
     ):
@@ -284,7 +298,7 @@ async def _update_push_session(push_session_id: uuid.UUID, verification_key: str
             f'{PUSH_SERVER_URL}/push_session/update/verification_key/verify',
             headers={
                 # TODO: rename to x-push-session-id
-                'x-session-id': push_session_id,
+                'x-session-id': str(push_session_id),
             },
             json={
                 'verification_key': verification_key,

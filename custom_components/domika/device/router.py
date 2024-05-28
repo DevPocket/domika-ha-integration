@@ -102,6 +102,7 @@ async def websocket_domika_update_push_token(
     # Do we need to make it async with callback somehow?
     event_result: dict[str, Any] | None = None
 
+    # TODO: make task.
     result = -1
     async with AsyncSessionFactory() as session:
         try:
@@ -114,6 +115,8 @@ async def websocket_domika_update_push_token(
                     session,
                     app_session_id,
                     cast(str, msg.get('push_token_hex')),
+                    cast(str, msg.get('platform')),
+                    cast(str, msg.get('environment')),
                 )
                 result = 2
             else:
@@ -214,8 +217,8 @@ async def websocket_domika_remove_push_session(
         vol.Required('type'): 'domika/update_push_session',
         vol.Required('original_transaction_id'): str,
         vol.Required('push_token_hex'): str,
-        vol.Required('platform'): str,
-        vol.Required('environment'): str,
+        vol.Required('platform'): vol.Any('ios', 'android', 'huawei'),
+        vol.Required('environment'): vol.Any('sandbox', 'production'),
     },
 )
 @async_response

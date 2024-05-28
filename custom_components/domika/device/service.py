@@ -61,6 +61,23 @@ async def update(
     return device
 
 
+async def update_in_place(
+    db_session: AsyncSession,
+    app_session_id: uuid.UUID,
+    device_in: DomikaDeviceUpdate,
+    *,
+    commit: bool = True,
+):
+    """Update device in place."""
+    stmt = sqlalchemy.update(Device)
+    stmt = stmt.where(Device.app_session_id == app_session_id)
+    stmt = stmt.values(**device_in.to_dict())
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
 async def delete(db_session: AsyncSession, app_session_id: uuid.UUID, *, commit: bool = True):
     """Delete device."""
     stmt = sqlalchemy.delete(Device).where(Device.app_session_id == app_session_id)

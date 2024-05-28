@@ -76,13 +76,22 @@ async def websocket_domika_get_dashboards(
         LOGGER.error('Got websocket message "get_dashboards", msg_id is missing.')
         return
 
-    LOGGER.debug('Got websocket message "get_dashboards", data: %s', msg)
-
+    LOGGER.debug(
+        'Got websocket message "get_dashboards", data: %s, user_id: %s',
+        msg,
+        connection.user.id,
+    )
     async with AsyncSessionFactory() as session:
         dashboards = await get(session, connection.user.id)
+
+    # LOGGER.debug('>>> %s', dashboards.dict() if dashboards else '')
 
     # TODO: it is better to return None if there are no dashboards found.
     connection.send_result(
         msg_id,
-        DomikaDashboardRead(**dashboards.dict()).to_dict() if dashboards else '',
+        DomikaDashboardRead.from_dict(
+            dashboards.dict(),
+        ).to_dict()
+        if dashboards
+        else '',
     )

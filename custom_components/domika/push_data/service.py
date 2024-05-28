@@ -42,13 +42,18 @@ async def get_by_platform(
     # TODO: add check for elapsed time.
     stmt = sqlalchemy.select(PushData)
     stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
-    stmt = stmt.where(Device.platform == platform)
+    # TODO: uncomment.
+    # stmt = stmt.where(Device.platform == platform)
     stmt = stmt.group_by(
         PushData.app_session_id,
         PushData.entity_id,
         PushData.attribute,
     )
     stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
+    stmt = stmt.order_by(
+        PushData.app_session_id,
+        PushData.entity_id,
+    )
     return (await db_session.scalars(stmt)).all()
 
 
@@ -162,6 +167,25 @@ async def delete(
         stmt = sqlalchemy.delete(PushData).where(PushData.event_id.in_(event_id))
     else:
         stmt = sqlalchemy.delete(PushData).where(PushData.event_id == event_id)
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
+async def delete_for_platform(
+    db_session: AsyncSession,
+    platform: str,
+    *,
+    commit: bool = True,
+):
+    """Delete push data by platform name."""
+    sq = sqlalchemy.select(PushData.event_id)
+    sq = sq.join(Device, PushData.app_session_id == Device.app_session_id)
+    sq = sq.where(Device.platform == platform)
+    sq = sq.scalar_subquery()
+
+    stmt = sqlalchemy.delete(PushData).where(PushData.event_id.in_(sq))
     await db_session.execute(stmt)
 
     if commit:

@@ -12,7 +12,7 @@ from typing import cast
 
 import homeassistant.helpers.entity_registry
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_ON
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 
 from ..const import SENSORS_DEVICE_CLASSES, SENSORS_DOMAIN
 from .models import DomikaCriticalSensor, DomikaCriticalSensorsRead
@@ -34,26 +34,48 @@ def get(hass: HomeAssistant) -> DomikaCriticalSensorsRead:
         if entity.hidden_by or entity.disabled_by:
             continue
 
-        sensor = hass.states.get(entity_id)
-
-        # TODO: Log message here?
-        if not sensor:
+        critical_sensor_state = get_critical_sensor_state(hass, entity_id)
+        if not critical_sensor_state:
             continue
 
-        device_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
-        if device_class in SENSORS_DEVICE_CLASSES:
-            result.sensors.append(
-                DomikaCriticalSensor(
-                    entity_id=entity_id,
-                    name=sensor.name,
-                    device_class=device_class,
-                    state=sensor.state,
-                    timestamp=int(
-                        max(sensor.last_updated_timestamp, sensor.last_changed_timestamp) * 1e6,
-                    ),
+        result.sensors.append(
+            DomikaCriticalSensor(
+                entity_id=entity_id,
+                name=critical_sensor_state.name,
+                device_class=cast(str, critical_sensor_state.attributes.get(ATTR_DEVICE_CLASS)),
+                state=critical_sensor_state.state,
+                timestamp=int(
+                    max(
+                        critical_sensor_state.last_updated_timestamp,
+                        critical_sensor_state.last_changed_timestamp,
+                    )
+                    * 1e6,
                 ),
-            )
-            if sensor.state == STATE_ON:
-                result.sensors_on.append(entity_id)
+            ),
+        )
+        if critical_sensor_state.state == STATE_ON:
+            result.sensors_on.append(entity_id)
 
     return result
+
+
+def get_critical_sensor_state(hass: HomeAssistant, entity_id: str) -> State | None:
+    """
+    Get critical sensor state by id.
+
+    Args:
+        hass: homeassistant core object.
+        entity_id: homeassistant entity id.
+
+    Returns:
+        critical sensor state if entity_id correcpond to critical sensors, None otherwise.
+    """
+    sensor = hass.states.get(entity_id)
+
+    # TODO: Log message here?
+    if sensor:
+        device_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
+        if device_class in SENSORS_DEVICE_CLASSES:
+            return sensor
+
+    return None

@@ -200,7 +200,7 @@ async def websocket_domika_verify_push_session(
             json_payload = {"verification_key": verification_key}
 
         r = await hass.async_add_executor_job(make_post_request, url, json_payload)
-        LOGGER.log_debug(f"verify_push_session result: {r.text}, {r.status_code}")
+        LOGGER.debug(f"verify_push_session result: {r.text}, {r.status_code}")
         res_dict = dict(json.loads(r.text))
         push_session_id = res_dict.get("push_session_id")
         if r.status_code == "201" and push_session_id:
@@ -224,7 +224,7 @@ async def remove_push_session(hass, app_session_id):
                 payload = {"push_session_id": push_session_id}
 
             r = await hass.async_add_executor_job(make_post_request, url, payload)
-            LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
+            LOGGER.debug(f"remove_push_session result: {r.text}, {r.status_code}")
 
 @websocket_api.websocket_command(
     {

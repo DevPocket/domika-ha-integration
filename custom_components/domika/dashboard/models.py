@@ -22,14 +22,16 @@ class Dashboard(AsyncBase):
     __tablename__ = 'dashboards'
 
     user_id: Mapped[str] = mapped_column(primary_key=True)
-    dashboard: Mapped[str]
+    dashboards: Mapped[str]
+    hash: Mapped[str]
 
 
 @dataclass
 class DomikaDashboardBase(DataClassJSONMixin):
     """Base dashboard model."""
 
-    dashboard: str
+    dashboards: str
+    hash: str
 
 
 @dataclass
@@ -45,7 +47,5 @@ class DomikaDashboardRead(DomikaDashboardBase):
 
 
 @dataclass
-class DomikaDashoardUpdate(DataClassJSONMixin):
+class DomikaDashoardUpdate(DomikaDashboardBase):
     """Dashboard update model."""
-
-    dashboard: str

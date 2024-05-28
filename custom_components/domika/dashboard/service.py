@@ -8,8 +8,6 @@ Application dashboard.
 Author(s): Artem Bezborodko
 """
 
-from dataclasses import asdict
-
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +21,7 @@ async def get(db_session: AsyncSession, user_id: str) -> Dashboard | None:
     return await db_session.scalar(stmt)
 
 
-async def create(
+async def create_or_update(
     db_session: AsyncSession,
     dashboard_in: DomikaDashboardCreate,
     *,
@@ -35,7 +33,8 @@ async def create(
     stmt = stmt.on_conflict_do_update(
         index_elements=[Dashboard.user_id],
         set_={
-            'dashboard': stmt.excluded.dashboard,
+            'dashboards': stmt.excluded.dashboards,
+            'hash': stmt.excluded.hash,
         },
     )
     stmt = stmt.returning(Dashboard)
@@ -56,7 +55,7 @@ async def update(
 ):
     """Update dashboard."""
     dashboard_attrs = dashboard.dict()
-    update_data = asdict(dashboard_in)
+    update_data = dashboard_in.to_dict()
     for attr in dashboard_attrs:
         if attr in update_data:
             setattr(dashboard, attr, update_data[attr])

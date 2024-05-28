@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from .models import DomikaDashboardCreate, DomikaDashboardRead
-from .service import create, get
+from .service import create_or_update, get
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -28,6 +28,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
     {
         vol.Required('type'): 'domika/update_dashboards',
         vol.Required('dashboards'): str,
+        vol.Required('hash'): str,
     },
 )
 @async_response
@@ -42,13 +43,19 @@ async def websocket_domika_update_dashboards(
         LOGGER.error('Got websocket message "update_dashboards", msg_id is missing.')
         return
 
-    LOGGER.debug('Got websocket message "update_dashboards", data: %s', msg)
+    LOGGER.debug(
+        'Got websocket message "update_dashboards", user: "%s", data: %s',
+        connection.user.id,
+        msg,
+    )
 
+    hash_ = cast(str, msg.get('hash'))  # Required in command schema.
     async with AsyncSessionFactory() as session:
-        await create(
+        await create_or_update(
             session,
             DomikaDashboardCreate(
-                dashboard=cast(str, msg.get('dashboards')),  # Required in command schema.
+                dashboards=cast(str, msg.get('dashboards')),  # Required in command schema.
+                hash=hash_,
                 user_id=connection.user.id,
             ),
         )
@@ -89,9 +96,7 @@ async def websocket_domika_get_dashboards(
     # TODO: it is better to return None if there are no dashboards found.
     connection.send_result(
         msg_id,
-        DomikaDashboardRead.from_dict(
-            dashboards.dict(),
-        ).to_dict()
+        DomikaDashboardRead.from_dict(dashboards.dict()).to_dict()
         if dashboards
-        else '',
+        else DomikaDashboardRead(dashboards='', hash=''),
     )

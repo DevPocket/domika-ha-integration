@@ -179,7 +179,7 @@ class Pusher:
     # Returns 1 if success
     # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
     # Returns -1 if app_session_id does not exist
-    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> int:
+    def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> bool:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or not token or not platform or not environment:
             push_logger.log_error(f"update_push_notification_token: one of the fields is empty, no record was updated: user_id={user_id}, token={token}, platform: {platform}, environment: {environment} ")
@@ -196,12 +196,25 @@ class Pusher:
                 if len(data) == 1:
                     push_session_id = data[0][1]
                     if push_session_id:
-                        payload = {"environment": environment, "token": token, "push_session_id": push_session_id, "platform": IOS_PLATFORM}
-                        url = 'https://domika.app/check_push_session'
-                        r = requests.post(url, json=payload)
+                        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+                        if MICHAELs_PUSH_SERVER:
+                            url = BASE_URL + 'check_push_session'
+                            payload = {"environment": environment,
+                                       "token": token,
+                                       "push_session_id": push_session_id,
+                                       "platform": IOS_PLATFORM}
+                        else:
+                            url = BASE_URL + 'push_session/check'
+                            payload = {"environment": environment,
+                                       "push_token": token,
+                                       "push_session_id": push_session_id,
+                                       "platform": IOS_PLATFORM}
+                            headers["x-session-id"] = push_session_id
+
+                        r = requests.request("post", url, json=payload, headers=headers)
 
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
-                        if r.text == "1":
+                        if r.status_code == "200":
                             # We don't want to store token in the integration in the future,
                             # it's a temp solution until we have a working push server
                             self.cur.execute("""
@@ -213,16 +226,8 @@ class Pusher:
                                 WHERE app_session_id = ?
                                 ;""", [token, platform, environment, app_session_id])
                             self.db.commit()
-                            return 1
-                        elif r.text == "2":
-                            return 2
-                        else:
-                            return 0
-                    else:
-                        return 0
-                else:
-                    # Wrong app_session_id
-                    return -1
+                            return True
+        return False
 
 
     def remove_app_session_id(self, app_session_id):
@@ -509,15 +514,22 @@ class Pusher:
                 push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    def send_notification_ios(self, push_session_id, environment, token, data, local=False):
+    def send_notification_ios(self, push_session_id, environment, token, data):
         push_logger.log_debug(f"send_notification_ios, environment: {environment}, token: {token}, data: {data}")
-        if not local:
-            url = 'https://domika.app/send_notification'
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if MICHAELs_PUSH_SERVER:
+            url = BASE_URL + 'send_notification'
+            payload = {"push_session_id": push_session_id,
+                       "environment": environment,
+                       "token": token,
+                       "data": data,
+                       "platform": IOS_PLATFORM}
         else:
-            url = 'http://127.0.0.1:5000/send_notification'
+            url = BASE_URL + 'notification/push'
+            payload = {"data": data}
+            headers["x-session-id"] = push_session_id
 
-        payload = {"push_session_id": push_session_id, "environment": environment, "token": token, "data": data, "platform": IOS_PLATFORM}
-        r = requests.post(url, json=payload)
+        r = requests.request("post", url, json=payload, headers=headers)
         push_logger.log_debug(f"send_notification_ios result: {r.text}, {r.status_code}")
 
         if r.status_code == 422:

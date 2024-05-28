@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import asyncio
-
+from . HA_Pusher.const import *
 from . HA_Pusher import pusher as push
 
 import voluptuous as vol
@@ -71,7 +70,10 @@ async def websocket_domika_update_push_token(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_push_token", data: {msg}')
-    pusher = push.Pusher("")
+    connection.send_result(
+        msg.get("id"), {"result": "accepted"}
+    )
+
     app_session_id = msg.get("app_session_id")
     user_id = connection.user.id
     push_token_hex = msg.get("push_token_hex")
@@ -80,20 +82,11 @@ async def websocket_domika_update_push_token(
 
     res = await hass.async_add_executor_job(job_update_push_notification_token, app_session_id, user_id, push_token_hex, platform, environment, hass)
 
-    connection.send_result(
-        msg.get("id"), {"result": res}
-    )
-
     dict_attributes = {"d.type": "push_activation"}
-    if res == 1:
+    if res:
         dict_attributes["push_activation_success"] = True
-    elif res == 2:
+    else:
         dict_attributes["push_activation_success"] = False
-    elif res == 0:
-        dict_attributes["push_activation_success"] = False
-    elif res == -1:
-        dict_attributes["push_activation_success"] = False
-        dict_attributes["invalid_app_session_id"] = True
 
     if dict_attributes:
         LOGGER.debug(f"""### domika_{app_session_id}, {dict_attributes} """)
@@ -144,6 +137,9 @@ async def websocket_domika_update_push_session(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_push_session", data: {msg}')
+    connection.send_result(
+        msg.get("id"), {"result": "accepted"}
+    )
 
     original_transaction_id = msg.get("original_transaction_id")
     token = msg.get("push_token_hex")
@@ -151,20 +147,21 @@ async def websocket_domika_update_push_session(
     environment = msg.get("environment")
 
     if original_transaction_id and token and platform and environment:
-        json_payload = {"original_transaction_id": original_transaction_id,
-                        "token": token,
-                        "platform": platform,
-                        "environment": environment}
-        r = await hass.async_add_executor_job(make_post_request, "https://domika.app/update_push_session", json_payload)
-        LOGGER.debug(f"update_push_session result: {r.text}, {r.status_code}")
+        if MICHAELs_PUSH_SERVER:
+            url = BASE_URL + "update_push_session"
+            json_payload = {"original_transaction_id": original_transaction_id,
+                            "token": token,
+                            "platform": platform,
+                            "environment": environment}
+        else:
+            url = BASE_URL + "push_session/create"
+            json_payload = {"original_transaction_id": original_transaction_id,
+                            "push_token": token,
+                            "platform": platform,
+                            "environment": environment}
 
-        connection.send_result(
-            msg.get("id"), {"result": 1, "text": f"{r.text}, {r.status_code}"}
-        )
-    else:
-        connection.send_result(
-            msg.get("id"), {"result": 0, "text": "one of the parameters is missing"}
-        )
+        r = await hass.async_add_executor_job(make_post_request, url, json_payload)
+        LOGGER.debug(f"update_push_session result: {r.text}, {r.status_code}")
 
 
 
@@ -184,26 +181,31 @@ async def websocket_domika_verify_push_session(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "verify_push_session", data: {msg}')
+    connection.send_result(
+        msg.get("id"), {"result": "accepted"}
+    )
+
     app_session_id = msg.get("app_session_id")
     verification_key = msg.get("verification_key")
 
     if app_session_id and verification_key:
         pusher = push.Pusher("")
         old_push_session_id = pusher.get_push_session(app_session_id)
-        # r = requests.post('https://domika.app/verify_push_session',
-        #                   json={"verification_key": verification_key, "old_push_session_id": old_push_session_id})
-        json_payload = {"verification_key": verification_key, "old_push_session_id": old_push_session_id}
-        r = await hass.async_add_executor_job(make_post_request, "https://domika.app/verify_push_session", json_payload)
-        # LOGGER.log_debug(f"verify_push_session result: {r.text}, {r.status_code}")
-        push_session_id = r.text
-        if push_session_id:
-            pusher.save_push_session(app_session_id, push_session_id)
-            connection.send_result( msg.get("id"), {"result": 1, "text": "ok"} )
+
+        if MICHAELs_PUSH_SERVER:
+            url = BASE_URL + "verify_push_session"
+            json_payload = {"verification_key": verification_key, "old_push_session_id": old_push_session_id}
         else:
-            connection.send_result( msg.get("id"), {"result": 0, "text": "verification failed"} )
+            url = BASE_URL + "push_session/create/verification_key/verify"
+            json_payload = {"verification_key": verification_key}
+
+        r = await hass.async_add_executor_job(make_post_request, url, json_payload)
+        LOGGER.log_debug(f"verify_push_session result: {r.text}, {r.status_code}")
+        res_dict = dict(json.loads(r.text))
+        push_session_id = res_dict.get("push_session_id")
+        if r.status_code == "201" and push_session_id:
+            pusher.save_push_session(app_session_id, push_session_id)
         pusher.close_connection()
-    else:
-        connection.send_result( msg.get("id"), {"result": 0, "text": "one of the parameters is missing"} )
 
 
 async def remove_push_session(hass, app_session_id):
@@ -213,17 +215,16 @@ async def remove_push_session(hass, app_session_id):
         pusher.save_push_session(app_session_id, "")
         pusher.close_connection()
         if push_session_id:
-            # r = requests.post('https://domika.app/remove_push_session',
-            #                   json={"push_session_id": push_session_id})
-            json_payload = {"push_session_id": push_session_id}
-            r = await hass.async_add_executor_job(make_post_request, "https://domika.app/remove_push_session",
-                                                  json_payload)
-            # LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
-            return {"result": 1, "text": "ok"}
-        else:
-            return {"result": 0, "text": f"push_session_id not found for app_session_id: {app_session_id}"}
-    else:
-        return {"result": 0, "text": "missing app_session_id"}
+            if MICHAELs_PUSH_SERVER:
+                url = BASE_URL + "remove_push_session"
+                payload = {"push_session_id": push_session_id}
+            else:
+                # TODO: Put the right URL
+                url = BASE_URL + "remove_push_session"
+                payload = {"push_session_id": push_session_id}
+
+            r = await hass.async_add_executor_job(make_post_request, url, payload)
+            LOGGER.log_debug(f"remove_push_session result: {r.text}, {r.status_code}")
 
 @websocket_api.websocket_command(
     {
@@ -240,9 +241,12 @@ async def websocket_domika_remove_push_session(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "remove_push_session", data: {msg}')
+    connection.send_result(
+        msg.get("id"), {"status": "accepted"}
+    )
+
     app_session_id = msg.get("app_session_id")
-    res = await remove_push_session(hass, app_session_id)
-    connection.send_result(msg.get("id"), res)
+    await remove_push_session(hass, app_session_id)
 
 
 @websocket_api.websocket_command(
@@ -306,12 +310,11 @@ def websocket_domika_resubscribe_push(
         msg: dict[str, Any],
 ) -> None:
     LOGGER.debug(f'Got websocket message "resubscribe_push", data: {msg}')
-    app_session_id = msg.get("app_session_id")
-
     connection.send_result(
-        msg.get("id"), {}
+        msg.get("id"), {"result": "accepted"}
     )
 
+    app_session_id = msg.get("app_session_id")
     pusher = push.Pusher("")
     pusher.resubscribe_push(
         app_session_id,
@@ -335,15 +338,16 @@ def websocket_domika_confirm_events(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "confirm_event", data: {msg}')
+    connection.send_result(
+        msg.get("id"), {"result": "accepted"}
+    )
+
     event_ids = msg.get("event_ids")
     app_session_id = msg.get("app_session_id")
     if event_ids and app_session_id:
         pusher = push.Pusher("")
         pusher.confirm_events(app_session_id, event_ids)
 
-    connection.send_result(
-        msg.get("id"), {}
-    )
 
 
 @websocket_api.websocket_command(
@@ -382,17 +386,16 @@ def websocket_domika_update_dashboards(
 ) -> None:
     """Handle domika request."""
     LOGGER.debug(f'Got websocket message "update_dashboards", user: {connection.user.id}, data: {msg}')
+    connection.send_result(
+        msg.get("id"), {"result": "accepted"}
+    )
+
     pusher = push.Pusher("")
     dash_hash = msg.get("hash")
     dashboards = msg.get("dashboards")
     pusher.save_dashboards(connection.user.id, dashboards, dash_hash)
-    connection.send_result(
-        msg.get("id"), {}
-    )
-
     app_session_ids = pusher.app_session_ids_for_user_id(connection.user.id)
     pusher.close_connection()
-
     for app_session_id in app_session_ids:
         LOGGER.debug(f"""### domika_{app_session_id}, dashboard_update """)
         hass.bus.async_fire_internal(f"domika_{app_session_id}", {"d.type": "dashboard_update", "hash": dash_hash})

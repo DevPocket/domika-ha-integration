@@ -77,5 +77,8 @@ def get_critical_sensors(hass) -> dict:
     return res
 
 
-def make_post_request(url, json_payload):
-    return requests.request("post", url, json=json_payload, headers={"Content-Type": "application/json"})
+def make_post_request(url, json_payload, additional_headers=None):
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if additional_headers:
+        headers.update(additional_headers)
+    return requests.request("post", url, json=json_payload, headers=headers)

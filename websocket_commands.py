@@ -201,8 +201,12 @@ async def websocket_domika_verify_push_session(
 
         r = await hass.async_add_executor_job(make_post_request, url, json_payload)
         LOGGER.debug(f"verify_push_session result: {r.text}, {r.status_code}")
-        res_dict = dict(json.loads(r.text))
-        push_session_id = res_dict.get("push_session_id")
+        if MICHAELs_PUSH_SERVER:
+            push_session_id = r.text
+        else:
+            res_dict = dict(json.loads(r.text))
+            push_session_id = res_dict.get("push_session_id")
+
         if r.status_code == "201" and push_session_id:
             pusher.save_push_session(app_session_id, push_session_id)
         pusher.close_connection()

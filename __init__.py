@@ -190,7 +190,7 @@ def forward_event(event):
                 sensor = HASS.states.get(entity_id)
                 device_class = sensor.attributes.get("device_class")
 
-                if device_class in SENSORS_DEVICE_CLASSES:
+                if device_class in CRITICAL_SENSORS_DEVICE_CLASSES:
                     # Fetch current state for all critical binary sensors.
                     sensors_data = get_critical_sensors(HASS)
                     # Fire the event for app to catch.

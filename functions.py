@@ -64,12 +64,23 @@ def get_critical_sensors(hass) -> dict:
 
         sensor = hass.states.get(entity_id)
         device_class = sensor.attributes.get("device_class")
-        if device_class in SENSORS_DEVICE_CLASSES:
+        if device_class in CRITICAL_SENSORS_DEVICE_CLASSES or device_class in WARNING_SENSORS_DEVICE_CLASSES:
+            if device_class in CRITICAL_SENSORS_DEVICE_CLASSES:
+                device_criticality = "critical"
+            else:
+                device_criticality = "warning"
             state = sensor.state
             name = sensor.name
             friendly_name = sensor.attributes.get("friendly_name")
             timestamp = int(max(sensor.last_updated_timestamp, sensor.last_changed_timestamp) * 1e6)
-            sensors_list.append({"entity_id": entity_id, "name": friendly_name or name, "device_class": device_class, "state": state, "timestamp": timestamp})
+            sensors_list.append({
+                "entity_id": entity_id,
+                "type": device_criticality,
+                "name": friendly_name or name,
+                "device_class": device_class,
+                "state": state,
+                "timestamp": timestamp
+            })
             if sensor.state == "on":
                 sensors_on_list.append(entity_id)
 

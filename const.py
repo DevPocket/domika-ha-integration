@@ -12,7 +12,7 @@ UPDATE_INTERVAL = timedelta(minutes=15)
 
 SENSORS_DOMAIN = "binary_sensor"
 
-SENSORS_DEVICE_ENUMS = [
+CRITICAL_SENSORS_DEVICE_ENUMS = [
     BinarySensorDeviceClass.CO,
     BinarySensorDeviceClass.GAS,
     BinarySensorDeviceClass.MOISTURE,
@@ -21,5 +21,14 @@ SENSORS_DEVICE_ENUMS = [
     BinarySensorDeviceClass.TAMPER
 ]
 
-SENSORS_DEVICE_CLASSES = [str(e) for e in SENSORS_DEVICE_ENUMS]
+WARNING_SENSORS_DEVICE_ENUMS = [
+    BinarySensorDeviceClass.BATTERY,
+    BinarySensorDeviceClass.COLD,
+    BinarySensorDeviceClass.HEAT,
+    BinarySensorDeviceClass.PROBLEM,
+    BinarySensorDeviceClass.VIBRATION
+]
+
+CRITICAL_SENSORS_DEVICE_CLASSES = [str(e) for e in CRITICAL_SENSORS_DEVICE_ENUMS]
+WARNING_SENSORS_DEVICE_CLASSES = [str(e) for e in WARNING_SENSORS_DEVICE_ENUMS]
 

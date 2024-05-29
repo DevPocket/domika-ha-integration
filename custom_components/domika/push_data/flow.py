@@ -19,10 +19,11 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import push_server_errors, statuses
-from ..const import IOS_PLATFORM, MAIN_LOGGER_NAME, PUSH_SERVER_URL
+from ..const import IOS_PLATFORM, MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from ..critical_sensor import service as critical_sensor_service
 from ..database.core import AsyncSessionFactory
-from ..device.models import Device
+from ..device import service as device_service
+from ..device.models import Device, DomikaDeviceUpdate
 from ..subscription.flow import get_app_session_id_by_attributes
 from ..utils import flatten_json
 from .models import DomikaPushDataCreate, PushData
@@ -34,13 +35,15 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 def _fire_events_to_app_session_ids(
     hass: HomeAssistant,
     event: Event[EventStateChangedData],
+    event_id: uuid.UUID,
     entity_id: str,
     attributes: set[tuple],
     app_session_ids: Sequence[uuid.UUID],
 ):
     dict_attributes = dict(attributes)
-    dict_attributes['entity_id'] = entity_id
     dict_attributes['d.type'] = 'state_changed'
+    dict_attributes['event_id'] = event_id
+    dict_attributes['entity_id'] = entity_id
     for app_session_id in app_session_ids:
         LOGGER.debug(
             '### domika_%s, %s, %s, %s, %s',
@@ -60,10 +63,6 @@ def _fire_events_to_app_session_ids(
 
 
 async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData]):
-    # Register only state_changed events.
-    # if event.event_type != 'state_changed':
-    #     return
-
     event_data: EventStateChangedData = event.data
     if not event_data:
         return
@@ -116,10 +115,10 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
         #     )
 
     # Store events into db.
-    event_uuid = uuid.uuid4()
-    # TODO: use timestamp from event.
+    event_id = uuid.uuid4()
+    # TODO: use timestamp from event. event.time_fired.timestamp() * 1e6
     push_data = [
-        DomikaPushDataCreate(event_uuid, entity_id, attribute[0], attribute[1], event.context.id)
+        DomikaPushDataCreate(event_id, entity_id, attribute[0], attribute[1], event.context.id)
         for attribute in attributes
     ]
     async with AsyncSessionFactory() as session:
@@ -133,36 +132,57 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     # If any app_session_ids are subscribed for these attributes - fire the event to those
     # app_session_ids for app to catch.
     if app_session_ids:
-        _fire_events_to_app_session_ids(hass, event, entity_id, attributes, app_session_ids)
+        _fire_events_to_app_session_ids(
+            hass,
+            event,
+            event_id,
+            entity_id,
+            attributes,
+            app_session_ids,
+        )
 
-    # # Record event in Pusher db.
-    # pusher.add_event(
-    #     entity_id,
-    #     attributes,
-    #     event.context.id,
-    #     event.time_fired.timestamp() * 1e6,
-    # )
 
+async def _send_push_data(
+    db_session: AsyncSession,
+    app_session_id: uuid.UUID,
+    push_session_id: uuid.UUID,
+    events_dict: dict,
+):
+    try:
+        async with (
+            aiohttp.ClientSession(json_serialize=json.dumps) as session,
+            session.post(
+                f'{PUSH_SERVER_URL}/notification/push',
+                headers={
+                    # TODO: rename to x-push-session-id
+                    'x-session-id': str(push_session_id),
+                },
+                json={'data': json.dumps(events_dict)},
+                timeout=PUSH_SERVER_TIMEOUT,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_204_NO_CONTENT:
+                # All OK. Notification pushed.
+                return
 
-async def _send_push_data(push_session_id: uuid.UUID, events_dict: dict):
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/notification/push',
-            headers={
-                # TODO: rename to x-push-session-id
-                'x-session-id': str(push_session_id),
-            },
-            json={'data': json.dumps(events_dict)},
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_200_OK:
-            return
+            if resp.status == statuses.HTTP_401_UNAUTHORIZED:
+                # Push session id not found on push server.
+                # Remove push session id for device.
+                device = await device_service.get(db_session, app_session_id)
+                if device:
+                    await device_service.update(
+                        db_session,
+                        device,
+                        DomikaDeviceUpdate(push_session_id=None),
+                    )
+                return
 
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
 
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.PushServerError(str(e)) from None
 
 
 async def _push_ios(db_session: AsyncSession):
@@ -190,14 +210,21 @@ async def _push_ios(db_session: AsyncSession):
     events_dict = {}
     current_entity_id: str | None = None
     current_push_session_id: uuid.UUID | None = None
+    current_app_session_id: uuid.UUID | None = None
 
     entity = {}
     for event in events:
         if current_push_session_id != event[1]:
             current_push_session_id = event[1]
+            current_app_session_id = event[0].app_session_id
             if events_dict and current_push_session_id:
                 LOGGER.debug('Push ios events. %s', events_dict)
-                await _send_push_data(current_push_session_id, events_dict)
+                await _send_push_data(
+                    db_session,
+                    current_app_session_id,  # type: ignore
+                    current_push_session_id,
+                    events_dict,
+                )
             current_entity_id = None
             events_dict = {}
         if current_entity_id != event[0].entity_id:
@@ -211,7 +238,12 @@ async def _push_ios(db_session: AsyncSession):
 
     if events_dict and current_push_session_id:
         LOGGER.debug('Push ios events. %s', events_dict)
-        await _send_push_data(current_push_session_id, events_dict)
+        await _send_push_data(
+            db_session,
+            current_app_session_id,  # type: ignore
+            current_push_session_id,
+            events_dict,
+        )
 
     # await delete_for_platform(db_session, IOS_PLATFORM)
 

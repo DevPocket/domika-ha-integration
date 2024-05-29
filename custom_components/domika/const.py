@@ -31,6 +31,9 @@ IOS_PRODUCTION_ENV = 'production'
 
 ANDROID_PLATFORM = 'android'
 
+# Seonds
+PUSH_SERVER_TIMEOUT = 10
+
 # Number of days
 DEVICE_EXPIRATION_TIME = 15
 

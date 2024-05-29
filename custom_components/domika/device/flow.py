@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import errors, push_server_errors, statuses
-from ..const import PUSH_SERVER_URL
+from ..const import PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 from .service import create, get, update
 
@@ -74,9 +74,11 @@ async def update_app_session_id(
     return result
 
 
-async def need_update_push_token(
+async def check_push_token(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
+    platform: str,
+    environment: str,
     push_token: str,
 ) -> bool:
     """
@@ -85,10 +87,12 @@ async def need_update_push_token(
     Args:
         db_session: sqlalchemy session.
         app_session_id: application session id.
-        push_token: device push token.
+        platform: application platform.
+        environment: application environment.
+        push_token: application push token.
 
     Returns:
-        bool: True if push_token need to be updated, False otherwise.
+        bool: True if push_token do not need to be updated, False otherwise.
 
     Raises:
         errors.AppSessionIdNotFoundError: if app session not found.
@@ -102,109 +106,55 @@ async def need_update_push_token(
     if not device:
         raise errors.AppSessionIdNotFoundError(app_session_id)
 
-    headers = {}
-    # TODO: Is it really need here?
-    if device.push_session_id:
-        headers = {
-            # TODO: rename to x-push-session-id
-            'x-session-id': str(device.push_session_id),
-        }
+    push_session_id = device.push_session_id
 
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/check',
-            json={
-                'push_token': push_token,
-            },
-            headers=headers,
-            timeout=10,
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_200_OK:
-            return False
+    try:
+        async with (
+            aiohttp.ClientSession(json_serialize=json.dumps) as session,
+            session.post(
+                f'{PUSH_SERVER_URL}/push_session/check',
+                headers={
+                    # TODO: rename to x-push-session-id
+                    'x-session-id': str(push_session_id),
+                }
+                if push_session_id
+                else None,
+                json={
+                    'push_token': push_token,
+                    'platform': platform,
+                    'environment': environment,
+                },
+                timeout=PUSH_SERVER_TIMEOUT,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_204_NO_CONTENT:
+                return True
 
-        if resp.status == statuses.HTTP_409_CONFLICT:
-            # Current push token conflicts with the given one.
-            return True
+            if resp.status == statuses.HTTP_202_ACCEPTED:
+                # Push server push token differs from the given one. Push server send verification
+                # key to the application. No need to remove current push session due to application
+                # can ignore verification key.
+                return False
 
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
+            if resp.status == statuses.HTTP_404_NOT_FOUND:
+                # Push server can't find push session with given triplet x-session-id/platform/
+                # environment.
+                # Need to remove current push session.
+                await update(db_session, device, DomikaDeviceUpdate(push_session_id=None))
+                raise push_server_errors.PushSessionIdNotFoundError(push_session_id)
 
-        if resp.status == statuses.HTTP_401_UNAUTHORIZED:
-            raise push_server_errors.PushSessionIdNotFoundError(device.push_session_id)
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
 
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
-
-
-async def update_push_token(
-    db_session: AsyncSession,
-    app_session_id: uuid.UUID,
-    push_token: str,
-    platform: str,
-    environment: str,
-) -> None:
-    """
-    Start push token update flow.
-
-    Args:
-        db_session: sqlalchemy session.
-        app_session_id: application session id.
-        push_token: device push token.
-        platform: application platform,
-        environment: application environment,
-
-    Raises:
-        errors.AppSessionIdNotFoundError: if app session not found.
-        push_server_errors.PushSessionIdNotFoundError: if push session id not found on the push
-        server.
-        push_server_errors.BadRequestError: if push server response with bad request.
-        push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
-        status.
-    """
-    device = await get(db_session, app_session_id)
-    if not device:
-        raise errors.AppSessionIdNotFoundError(app_session_id)
-
-    await update(
-        db_session,
-        device,
-        DomikaDeviceUpdate(
-            push_token=push_token,
-            platform=platform,
-            environment=environment,
-        ),
-    )
-
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/update',
-            json={
-                'push_token': push_token,
-            },
-            headers={
-                # TODO: rename to x-push-session-id
-                'x-session-id': str(device.push_session_id),
-            },
-        ) as resp,
-    ):
-        if resp.status in {statuses.HTTP_200_OK, statuses.HTTP_202_ACCEPTED}:
-            return
-
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
-
-        if resp.status == statuses.HTTP_401_UNAUTHORIZED:
-            raise push_server_errors.PushSessionIdNotFoundError(device.push_session_id)
-
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.PushServerError(str(e)) from None
 
 
 async def remove_push_session(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
-):
+) -> uuid.UUID:
     """
     Remove push session from push server.
 
@@ -227,25 +177,33 @@ async def remove_push_session(
 
     if not device.push_session_id:
         raise errors.PushSessionIdNotFoundError(app_session_id)
+    push_session_id = device.push_session_id
 
-    await update(db_session, device, DomikaDeviceUpdate(push_session_id=None))
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/remove',
-            headers={
-                # TODO: rename to x-push-session-id
-                'x-session-id': str(device.push_session_id),
-            },
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_200_OK:
-            return
+    try:
+        await update(db_session, device, DomikaDeviceUpdate(push_session_id=None))
+        async with (
+            aiohttp.ClientSession(json_serialize=json.dumps) as session,
+            session.delete(
+                f'{PUSH_SERVER_URL}/push_session',
+                headers={
+                    # TODO: rename to x-push-session-id
+                    'x-session-id': str(push_session_id),
+                },
+                timeout=PUSH_SERVER_TIMEOUT,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_204_NO_CONTENT:
+                return push_session_id
 
-        if resp.status == statuses.HTTP_401_UNAUTHORIZED:
-            raise push_server_errors.PushSessionIdNotFoundError(device.push_session_id)
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
 
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
+            if resp.status == statuses.HTTP_401_UNAUTHORIZED:
+                raise push_server_errors.PushSessionIdNotFoundError(push_session_id)
+
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.PushServerError(str(e)) from None
 
 
 async def create_push_session(
@@ -270,85 +228,39 @@ async def create_push_session(
         status.
     """
     if not (original_transaction_id and push_token and platform and environment):
-        msg = 'one of the parameters is missing'
+        msg = 'One of the parameters is missing'
         raise ValueError(msg)
 
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/create',
-            json={
-                'original_transaction_id': original_transaction_id,
-                'platform': platform,
-                'environment': environment,
-                'push_token': push_token,
-            },
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_202_ACCEPTED:
-            return
+    try:
+        async with (
+            aiohttp.ClientSession(json_serialize=json.dumps) as session,
+            session.post(
+                f'{PUSH_SERVER_URL}/push_session/create',
+                json={
+                    'original_transaction_id': original_transaction_id,
+                    'platform': platform,
+                    'environment': environment,
+                    'push_token': push_token,
+                },
+                timeout=PUSH_SERVER_TIMEOUT,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_202_ACCEPTED:
+                return
 
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
 
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
-
-
-async def _update_push_session(push_session_id: uuid.UUID, verification_key: str):
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/update/verification_key/verify',
-            headers={
-                # TODO: rename to x-push-session-id
-                'x-session-id': str(push_session_id),
-            },
-            json={
-                'verification_key': verification_key,
-            },
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_200_OK:
-            return
-
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
-
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
-
-
-async def _create_push_session(verification_key: str) -> uuid.UUID:
-    async with (
-        aiohttp.ClientSession(json_serialize=json.dumps) as session,
-        session.post(
-            f'{PUSH_SERVER_URL}/push_session/create/verification_key/verify',
-            json={
-                'verification_key': verification_key,
-            },
-        ) as resp,
-    ):
-        if resp.status == statuses.HTTP_201_CREATED:
-            try:
-                body = await resp.json()
-                result = uuid.UUID(body.get('push_session_id'))
-            except json.JSONDecodeError as e:
-                raise push_server_errors.ResponseError(e) from None
-            except ValueError:
-                msg = 'Malformed push_session_id.'
-                raise push_server_errors.ResponseError(msg) from None
-            return result
-
-        if resp.status == statuses.HTTP_400_BAD_REQUEST:
-            raise push_server_errors.BadRequestError(await resp.json())
-
-        raise push_server_errors.UnexpectedServerResponseError(resp.status)
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.PushServerError(str(e)) from None
 
 
 async def verify_push_session(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     verification_key: str,
-):
+) -> uuid.UUID:
     """
     Finishes push session generation.
 
@@ -366,20 +278,52 @@ async def verify_push_session(
         push_server_errors.ResponseError: if push server response with malformed data.
     """
     if not verification_key:
-        msg = 'one of the parameters is missing'
+        msg = 'One of the parameters is missing'
         raise ValueError(msg)
 
     device = await get(db_session, app_session_id)
     if not device:
         raise errors.AppSessionIdNotFoundError(app_session_id)
 
-    if device.push_session_id:
-        await _update_push_session(device.push_session_id, verification_key)
-    else:
-        await update(
-            db_session,
-            device,
-            DomikaDeviceUpdate(
-                push_session_id=await _create_push_session(verification_key),
-            ),
-        )
+    try:
+        async with (
+            aiohttp.ClientSession(json_serialize=json.dumps) as session,
+            session.post(
+                f'{PUSH_SERVER_URL}/push_session/verify',
+                headers={
+                    # TODO: rename to x-push-session-id
+                    'x-session-id': str(device.push_session_id),
+                }
+                if device.push_session_id
+                else None,
+                json={
+                    'verification_key': verification_key,
+                },
+                timeout=PUSH_SERVER_TIMEOUT,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_201_CREATED:
+                try:
+                    body = await resp.json()
+                    push_session_id = uuid.UUID(body.get('push_session_id'))
+                except json.JSONDecodeError as e:
+                    raise push_server_errors.ResponseError(e) from None
+                except ValueError:
+                    msg = 'Malformed push_session_id.'
+                    raise push_server_errors.ResponseError(msg) from None
+                await update(
+                    db_session,
+                    device,
+                    DomikaDeviceUpdate(push_session_id=push_session_id),
+                )
+                return push_session_id
+
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
+
+            if resp.status == statuses.HTTP_409_CONFLICT:
+                raise push_server_errors.InvalidVerificationKeyError()
+
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.PushServerError(str(e)) from None

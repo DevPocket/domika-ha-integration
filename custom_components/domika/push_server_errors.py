@@ -25,15 +25,19 @@ class BadRequestError(PushServerError):
     """Push server replies with bad request."""
 
     def __init__(self, body: dict):
-        super().__init__('Push server replies with bad request.')
+        super().__init__('Push server replies with bad request')
         self.body = body
+
+
+class InvalidVerificationKeyError(PushServerError):
+    """Push server reject verification key."""
 
 
 class UnexpectedServerResponseError(PushServerError):
     """Push server replies with unexpected status."""
 
     def __init__(self, status: int):
-        super().__init__(f'Push server replies with unexpected status {status}.')
+        super().__init__(f'Push server replies with unexpected status {status}')
         self.status = status
 
 
@@ -41,7 +45,7 @@ class PushSessionIdNotFoundError(PushServerError):
     """Push session id found on the push server."""
 
     def __init__(self, push_session_id: uuid.UUID):
-        super().__init__(f'Push session with id "{push_session_id}" not found on the push server.')
+        super().__init__(f'Push session with id "{push_session_id}" not found on the push server')
         self.push_session_id = push_session_id
 
 
@@ -56,6 +60,6 @@ class PushTokenMismatchError(PushServerError):
     def __init__(self, push_token: str):
         super().__init__(
             f'Push token with id "{push_token}" does not match the one already'
-            f'registered on the server.',
+            f'registered on the server',
         )
         self.push_token = push_token

@@ -13,6 +13,7 @@ import logging
 import uuid
 from typing import Any, cast
 
+import sqlalchemy.exc
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import (
@@ -25,11 +26,10 @@ from .. import errors, push_server_errors
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from .flow import (
+    check_push_token,
     create_push_session,
-    need_update_push_token,
     remove_push_session,
     update_app_session_id,
-    update_push_token,
     verify_push_session,
 )
 from .service import delete
@@ -73,10 +73,78 @@ async def websocket_domika_update_app_session(
     )
 
 
+async def _check_push_token(
+    hass: HomeAssistant,
+    app_session_id: uuid.UUID,
+    platform: str,
+    environment: str,
+    push_token_hex: str,
+):
+    event_result: dict[str, Any] | None = None
+    try:
+        async with AsyncSessionFactory() as session:
+            if await check_push_token(
+                session,
+                app_session_id,
+                platform,
+                environment,
+                push_token_hex,
+            ):
+                event_result = {
+                    'd.type': 'push_activation',
+                    'push_activation_success': True,
+                }
+                LOGGER.debug('Push token "%s" check. OK', push_token_hex)
+            else:
+                event_result = {
+                    'd.type': 'push_activation',
+                    'push_activation_success': False,
+                }
+                LOGGER.debug('Push token "%s" check. Need validation', push_token_hex)
+    except errors.AppSessionIdNotFoundError:
+        LOGGER.error(
+            'Can\'t check push token "%s". App session id "%s" not found',
+            push_token_hex,
+            app_session_id,
+        )
+        event_result = {
+            'd.type': 'push_activation',
+            'invalid_app_session_id': True,
+        }
+    except push_server_errors.PushSessionIdNotFoundError as e:
+        if e.push_session_id is None:
+            LOGGER.debug('Can\'t check push token "%s". Missing push session id', push_token_hex)
+        else:
+            LOGGER.error('Can\'t check push token "%s". %s', push_token_hex, e)
+        event_result = {
+            'd.type': 'push_activation',
+            'push_activation_success': False,
+        }
+    except (
+        push_server_errors.UnexpectedServerResponseError,
+        push_server_errors.BadRequestError,
+    ) as e:
+        LOGGER.error('Can\'t check push token "%s". Push server error. %s', push_token_hex, e)
+        event_result = {
+            'd.type': 'push_activation',
+            'push_activation_success': False,
+        }
+    except push_server_errors.PushServerError as e:
+        LOGGER.error('Can\'t check push token "%s". Push server error. %s', push_token_hex, e)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error('Can\'t check push token "%s". Database error. %s', push_token_hex, e)
+    except Exception as e:
+        LOGGER.exception('Can\'t check push token "%s". Unhandled error. %s', push_token_hex, e)
+
+    if event_result:
+        LOGGER.debug('### domika_%s, %s', app_session_id, event_result)
+        hass.bus.async_fire(f'domika_{app_session_id}', event_result)
+
+
 @websocket_command(
     {
         vol.Required('type'): 'domika/update_push_token',
-        vol.Optional('app_session_id'): vol.Coerce(uuid.UUID),
+        vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('push_token_hex'): str,
         vol.Required('platform'): vol.Any('ios', 'android', 'huawei'),
         vol.Required('environment'): vol.Any('sandbox', 'production'),
@@ -96,95 +164,46 @@ async def websocket_domika_update_push_token(
 
     LOGGER.debug('Got websocket message "update_push_token", data: %s', msg)
 
-    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('update_push_token msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
-    # This method involves http request. We need to assume it may take quite some time.
-    # Do we need to make it async with callback somehow?
-    event_result: dict[str, Any] | None = None
-
-    # TODO: make task.
-    result = -1
-    async with AsyncSessionFactory() as session:
-        try:
-            if await need_update_push_token(
-                session,
-                app_session_id,
-                cast(str, msg.get('push_token_hex')),
-            ):
-                await update_push_token(
-                    session,
-                    app_session_id,
-                    cast(str, msg.get('push_token_hex')),
-                    cast(str, msg.get('platform')),
-                    cast(str, msg.get('environment')),
-                )
-                result = 2
-            else:
-                result = 1
-                event_result = {
-                    'd.type': 'push_activation',
-                    'push_activation_success': True,
-                }
-        except errors.AppSessionIdNotFoundError:
-            result = -1
-            event_result = {
-                'd.type': 'push_activation',
-                'invalid_app_session_id': True,
-            }
-        except (
-            push_server_errors.PushSessionIdNotFoundError,
-            push_server_errors.UnexpectedServerResponseError,
-            push_server_errors.BadRequestError,
-        ):
-            result = 0
-            event_result = {
-                'd.type': 'push_activation',
-                'push_activation_success': False,
-            }
-
-    if event_result:
-        LOGGER.debug('### domika_%s, %s', app_session_id, event_result)
-        hass.bus.async_fire(f'domika_{app_session_id}', event_result)
-
-    connection.send_result(msg_id, {'result': result})
-    LOGGER.debug('update_push_token msg_id=%s data=%s', msg_id, {'result': result})
+    hass.async_create_task(
+        _check_push_token(
+            hass,
+            cast(uuid.UUID, msg.get('app_session_id')),
+            cast(str, msg.get('platform')),
+            cast(str, msg.get('environment')),
+            cast(str, msg.get('push_token_hex')),
+        ),
+        'check_push_token',
+    )
 
 
-async def _remove_push_session(app_session_id: uuid.UUID) -> dict:
-    result: dict[str, Any] = {}
-    async with AsyncSessionFactory() as session:
-        try:
-            await remove_push_session(session, app_session_id)
-            result = {
-                'result': 1,
-                'text': 'ok',
-            }
-        except errors.AppSessionIdNotFoundError as e:
-            result = {
-                'result': 0,
-                'text': f'app_session_id "{e.app_session_id}" not found',
-            }
-        except errors.PushSessionIdNotFoundError as e:
-            result = {
-                'result': 0,
-                'text': f'push_session_id not found for app_session_id "{e.app_session_id}"',
-            }
-        except push_server_errors.PushSessionIdNotFoundError as e:
-            result = {
-                'result': 0,
-                'text': f'push_session_id "{e.push_session_id}" not found on the push server',
-            }
-        except push_server_errors.BadRequestError:
-            result = {
-                'result': 0,
-                'text': 'push server respond with bad request',
-            }
-        except push_server_errors.UnexpectedServerResponseError as e:
-            result = {
-                'result': 0,
-                'text': f'push server unexpected response "{e.status}"',
-            }
-    return result
+async def _remove_push_session(app_session_id: uuid.UUID):
+    try:
+        async with AsyncSessionFactory() as session:
+            push_session_id = await remove_push_session(session, app_session_id)
+            LOGGER.info('Push session "%s" successfully removed.', push_session_id)
+    except errors.AppSessionIdNotFoundError as e:
+        LOGGER.info(
+            'Can\'t remove push session. Application with id "%s" not found.',
+            e.app_session_id,
+        )
+    except errors.PushSessionIdNotFoundError as e:
+        LOGGER.warning(
+            "Can't remove push session. "
+            'Application with id "%s" has no associated push session id.',
+            e.app_session_id,
+        )
+    except push_server_errors.BadRequestError as e:
+        LOGGER.error("Can't remove push session. Push server error. %s. %s", e, e.body)
+    except push_server_errors.PushServerError as e:
+        LOGGER.error("Can't remove push session. Push server error. %s", e)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error("Can't remove push session. Database error. %s", e)
+    except Exception as e:
+        LOGGER.exception("Can't remove push session. Unhandled error. %s", e)
 
 
 @websocket_command(
@@ -195,7 +214,7 @@ async def _remove_push_session(app_session_id: uuid.UUID) -> dict:
 )
 @async_response
 async def websocket_domika_remove_push_session(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -206,10 +225,65 @@ async def websocket_domika_remove_push_session(
         return
 
     LOGGER.debug('Got websocket message "remove_push_session", data: %s', msg)
-    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
-    result = await _remove_push_session(app_session_id)
-    connection.send_result(msg_id, result)
-    LOGGER.debug('remove_push_session msg_id=%s data=%s', msg_id, result)
+
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('remove_push_session msg_id=%s data=%s', msg_id, {'result': 'accepted'})
+
+    hass.async_create_task(
+        _remove_push_session(cast(uuid.UUID, msg.get('app_session_id'))),
+        'remove_push_session',
+    )
+
+
+async def _create_push_session(
+    original_transaction_id: str,
+    platform: str,
+    environment: str,
+    push_token: str,
+):
+    try:
+        await create_push_session(original_transaction_id, platform, environment, push_token)
+        LOGGER.info(
+            'Push session creation process successfully initialized. '
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s"',
+            original_transaction_id,
+            platform,
+            environment,
+            push_token,
+        )
+    except ValueError as e:
+        LOGGER.error(
+            "Can't initialize push session creation. "
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" %s',
+            original_transaction_id,
+            platform,
+            environment,
+            push_token,
+            e,
+        )
+    except push_server_errors.PushServerError as e:
+        LOGGER.error(
+            "Can't initialize push session creation. "
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" '
+            'Push server error. %s',
+            original_transaction_id,
+            platform,
+            environment,
+            push_token,
+            e,
+        )
+    except Exception as e:
+        LOGGER.exception(
+            "Can't initialize push session creation. "
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" '
+            'Unhandled error. %s',
+            original_transaction_id,
+            platform,
+            environment,
+            push_token,
+            e,
+        )
 
 
 @websocket_command(
@@ -223,7 +297,7 @@ async def websocket_domika_remove_push_session(
 )
 @async_response
 async def websocket_domika_update_push_session(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -235,36 +309,59 @@ async def websocket_domika_update_push_session(
 
     LOGGER.debug('Got websocket message "update_push_session", data: %s', msg)
 
-    result: dict[str, Any] = {}
-    try:
-        await create_push_session(
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('update_push_session msg_id=%s data=%s', msg_id, {'result': 'accepted'})
+
+    hass.async_create_task(
+        _create_push_session(
             cast(str, msg.get('original_transaction_id')),
             cast(str, msg.get('platform')),
             cast(str, msg.get('environment')),
             cast(str, msg.get('push_token_hex')),
-        )
-        result = {
-            'result': 1,
-            'text': 'ok',
-        }
-    except ValueError as e:
-        result = {
-            'result': 0,
-            'text': f'{e}',
-        }
-    except push_server_errors.BadRequestError:
-        result = {
-            'result': 0,
-            'text': 'push server respond with bad request',
-        }
-    except push_server_errors.UnexpectedServerResponseError as e:
-        result = {
-            'result': 0,
-            'text': f'push server unexpected response "{e.status}"',
-        }
+        ),
+        'create_push_session',
+    )
 
-    connection.send_result(msg_id, result)
-    LOGGER.debug('update_push_session msg_id=%s data=%s', msg_id, result)
+
+async def _remove_app_session(app_session_id: uuid.UUID):
+    try:
+        async with AsyncSessionFactory() as session:
+            try:
+                push_session_id = await remove_push_session(session, app_session_id)
+                LOGGER.info(
+                    'Push session "%s" for app session "%s" successfully removed.',
+                    push_session_id,
+                    app_session_id,
+                )
+            except errors.AppSessionIdNotFoundError as e:
+                LOGGER.error(
+                    'Can\'t remove app session. Application with id "%s" not found.',
+                    e.app_session_id,
+                )
+                return
+            except errors.PushSessionIdNotFoundError:
+                pass
+            except push_server_errors.BadRequestError as e:
+                LOGGER.error(
+                    'Can\'t remove push session for app session "%s". Push server error. %s. %s',
+                    app_session_id,
+                    e,
+                    e.body,
+                )
+            except push_server_errors.PushServerError as e:
+                LOGGER.error(
+                    'Can\'t remove push session for app session "%s". Push server error. %s',
+                    app_session_id,
+                    e,
+                )
+
+            await delete(session, app_session_id)
+            LOGGER.info('App session "%s" successfully removed.', app_session_id)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error("Can't remove app session. Database error. %s", e)
+    except Exception as e:
+        LOGGER.exception("Can't remove app session. Unhandled error. %s", e)
 
 
 @websocket_command(
@@ -275,7 +372,7 @@ async def websocket_domika_update_push_session(
 )
 @async_response
 async def websocket_domika_remove_app_session(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -287,13 +384,66 @@ async def websocket_domika_remove_app_session(
 
     LOGGER.debug('Got websocket message "remove_app_session", data: %s', msg)
 
-    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
-    async with AsyncSessionFactory() as session:
-        await delete(session, app_session_id)
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('remove_app_session msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
-    result = await _remove_push_session(app_session_id)
-    connection.send_result(msg_id, result)
-    LOGGER.debug('remove_app_session msg_id=%s data=%s', msg_id, result)
+    hass.async_create_task(
+        _remove_app_session(cast(uuid.UUID, msg.get('app_session_id'))),
+        'remove_app_session',
+    )
+
+
+async def _verify_push_session(
+    app_session_id: uuid.UUID,
+    verification_key: str,
+):
+    try:
+        async with AsyncSessionFactory() as session:
+            push_session_id = await verify_push_session(session, app_session_id, verification_key)
+        LOGGER.info(
+            'Verification key "%s" for application "%s" successfully verified. '
+            'New push session id "%s"',
+            verification_key,
+            app_session_id,
+            push_session_id,
+        )
+    except (ValueError, errors.AppSessionIdNotFoundError) as e:
+        LOGGER.error(
+            'Can\'t verify verification key "%s" for application "%s". %s',
+            verification_key,
+            app_session_id,
+            e,
+        )
+    except push_server_errors.BadRequestError as e:
+        LOGGER.error(
+            'Can\'t verify verification key "%s" for application "%s". Push server error. %s. %s',
+            verification_key,
+            app_session_id,
+            e,
+            e.body,
+        )
+    except push_server_errors.PushServerError as e:
+        LOGGER.error(
+            'Can\'t verify verification key "%s" for application "%s". Push server error. %s',
+            verification_key,
+            app_session_id,
+            e,
+        )
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error(
+            'Can\'t verify verification key "%s" for application "%s". Database error. %s',
+            verification_key,
+            app_session_id,
+            e,
+        )
+    except Exception as e:
+        LOGGER.exception(
+            'Can\'t verify verification key "%s" for application "%s". Unhandled error. %s',
+            verification_key,
+            app_session_id,
+            e,
+        )
 
 
 @websocket_command(
@@ -305,7 +455,7 @@ async def websocket_domika_remove_app_session(
 )
 @async_response
 async def websocket_domika_verify_push_session(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -317,43 +467,14 @@ async def websocket_domika_verify_push_session(
 
     LOGGER.debug('Got websocket message "verify_push_session", data: %s', msg)
 
-    result: dict[str, Any] = {}
-    try:
-        async with AsyncSessionFactory() as session:
-            await verify_push_session(
-                session,
-                cast(uuid.UUID, msg.get('app_session_id')),
-                cast(str, msg.get('verification_key')),
-            )
-        result = {
-            'result': 1,
-            'text': 'ok',
-        }
-    except ValueError as e:
-        result = {
-            'result': 0,
-            'text': f'{e}',
-        }
-    except errors.AppSessionIdNotFoundError as e:
-        result = {
-            'result': 0,
-            'text': f'app_session_id "{e.app_session_id}" not found',
-        }
-    except push_server_errors.BadRequestError:
-        result = {
-            'result': 0,
-            'text': 'push server respond with bad request',
-        }
-    except push_server_errors.UnexpectedServerResponseError as e:
-        result = {
-            'result': 0,
-            'text': f'push server unexpected response "{e.status}"',
-        }
-    except push_server_errors.ResponseError as e:
-        result = {
-            'result': 0,
-            'text': f'push server response error "{e}"',
-        }
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('verify_push_session msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
-    connection.send_result(msg_id, result)
-    LOGGER.debug('verify_push_session msg_id=%s data=%s', msg_id, result)
+    hass.async_create_task(
+        _verify_push_session(
+            cast(uuid.UUID, msg.get('app_session_id')),
+            cast(str, msg.get('verification_key')),
+        ),
+        'verify_push_session',
+    )

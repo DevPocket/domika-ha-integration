@@ -16,4 +16,6 @@ MICHAELs_PUSH_SERVER = False
 if MICHAELs_PUSH_SERVER:
     BASE_URL = "https://domika.app/"
 else:
-    BASE_URL = "https://domika.app/"
+    BASE_URL = "http://159.203.109.27:8000/api/v1/"
+
+#http://159.203.109.27:8000/api/v1/docs#/

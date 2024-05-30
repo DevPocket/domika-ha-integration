@@ -19,7 +19,7 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import push_server_errors, statuses
-from ..const import IOS_PLATFORM, MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
+from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from ..critical_sensor import service as critical_sensor_service
 from ..database.core import AsyncSessionFactory
 from ..device import service as device_service
@@ -27,9 +27,11 @@ from ..device.models import Device, DomikaDeviceUpdate
 from ..subscription.flow import get_app_session_id_by_attributes
 from ..utils import flatten_json
 from .models import DomikaPushDataCreate, PushData
-from .service import create, delete_for_platform, get_by_platform
+from .service import create
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+
+DOMIKA_CRITICAL_SENSOR_CHANGED = 'domika_critical_sensors_changed'
 
 
 def _fire_events_to_app_session_ids(
@@ -92,33 +94,25 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
             sensors_data = critical_sensor_service.get(hass)
             # Fire the event for app.
             hass.bus.async_fire(
-                'critical_sensors_changed',
+                DOMIKA_CRITICAL_SENSOR_CHANGED,
                 sensors_data.to_dict(),
                 event.origin,
                 event.context,
                 event.time_fired.timestamp(),
             )
 
-        # sensor = hass.states.get(entity_id)
-        # # Get device_class for this binary sensor.
-        # device_class = sensor.attributes.get('device_class')
-
-        # if device_class in SENSORS_DEVICE_CLASSES:
-        #     sensors_data = get_critical_sensors(HASS)
-        #     # Fire the event for app to catch.
-        #     hass.bus.async_fire(
-        #         'critical_sensors_changed',
-        #         sensors_data,
-        #         event.origin,
-        #         event.context,
-        #         event.time_fired.timestamp(),
-        #     )
-
     # Store events into db.
     event_id = uuid.uuid4()
     # TODO: use timestamp from event. event.time_fired.timestamp() * 1e6
     push_data = [
-        DomikaPushDataCreate(event_id, entity_id, attribute[0], attribute[1], event.context.id)
+        DomikaPushDataCreate(
+            event_id,
+            entity_id,
+            attribute[0],
+            attribute[1],
+            event.context.id,
+            int(event.time_fired.timestamp() * 1e6),
+        )
         for attribute in attributes
     ]
     async with AsyncSessionFactory() as session:
@@ -175,6 +169,11 @@ async def _send_push_data(
                         device,
                         DomikaDeviceUpdate(push_session_id=None),
                     )
+                    LOGGER.info(
+                        'Push session "%s" for app session "%s" successfully removed.',
+                        push_session_id,
+                        app_session_id,
+                    )
                 return
 
             if resp.status == statuses.HTTP_400_BAD_REQUEST:
@@ -189,9 +188,7 @@ async def _push_ios(db_session: AsyncSession):
     # TODO: add check for elapsed time.
     stmt = sqlalchemy.select(PushData, Device.push_session_id)
     stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
-    # TODO: uncomment.
     stmt = stmt.where(Device.push_session_id.is_not(None))
-    # stmt = stmt.where(Device.platform == IOS_PLATFORM)
     stmt = stmt.group_by(
         PushData.app_session_id,
         PushData.entity_id,
@@ -204,8 +201,6 @@ async def _push_ios(db_session: AsyncSession):
         PushData.entity_id,
     )
     events = (await db_session.execute(stmt)).all()
-
-    # events = await get_by_platform(db_session, IOS_PLATFORM)
 
     events_dict = {}
     current_entity_id: str | None = None

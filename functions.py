@@ -93,3 +93,9 @@ def make_post_request(url, json_payload, additional_headers=None):
     if additional_headers:
         headers.update(additional_headers)
     return requests.request("post", url, json=json_payload, headers=headers)
+
+def make_delete_request(url, json_payload, additional_headers=None):
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if additional_headers:
+        headers.update(additional_headers)
+    return requests.request("delete", url, json=json_payload, headers=headers)

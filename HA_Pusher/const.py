@@ -12,7 +12,7 @@ ANDROID_PLATFORM = "android"
 # Number of days
 DEVICE_EXPIRATION_TIME = 15
 
-MICHAELs_PUSH_SERVER = True
+MICHAELs_PUSH_SERVER = False
 if MICHAELs_PUSH_SERVER:
     BASE_URL = "https://domika.app/"
 else:

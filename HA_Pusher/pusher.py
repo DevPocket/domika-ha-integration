@@ -175,10 +175,6 @@ class Pusher:
                     push_logger.log_error(f"SQLite traceback: {traceback.format_exception(*sys.exc_info())}")
 
 
-    # Returns 2 if app_session_id exists, push_session_id exists and confirmed on the server, but the token is different
-    # Returns 1 if success
-    # Returns 0 if app_session_id exists, but token can't be activated or push_session_id does not exist
-    # Returns -1 if app_session_id does not exist
     def update_push_notification_token(self, app_session_id, user_id, token, platform, environment) -> bool:
         push_logger.log_debug(f"update_push_notification_token, app_session_id={app_session_id}, user_id={user_id}, token={token}, platform={platform}, environment={environment}")
         if not user_id or not token or not platform or not environment:
@@ -207,14 +203,13 @@ class Pusher:
                             url = BASE_URL + 'push_session/check'
                             payload = {"environment": environment,
                                        "push_token": token,
-                                       "push_session_id": push_session_id,
                                        "platform": IOS_PLATFORM}
                             headers["x-session-id"] = push_session_id
 
                         r = requests.request("post", url, json=payload, headers=headers)
 
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
-                        if r.status_code == "200":
+                        if r.status_code == "202" or r.status_code == "204":
                             # We don't want to store token in the integration in the future,
                             # it's a temp solution until we have a working push server
                             self.cur.execute("""

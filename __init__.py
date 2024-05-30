@@ -27,9 +27,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def send_pushes_regularly(time):
+        LOGGER.debug(f"send_pushes_regularly")
         await hass.async_add_executor_job(generate_push_notifications_ios, hass)
 
-    async def generate_push_notifications_ios(hass):
+    def generate_push_notifications_ios(hass):
+        LOGGER.debug(f"generate_push_notifications_ios in init")
         pusher = push.Pusher("")
         pusher.generate_push_notifications_ios()
         pusher.close_connection()
@@ -51,7 +53,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     websocket_api.async_register_command(hass, websocket_domika_update_dashboards)
     websocket_api.async_register_command(hass, websocket_domika_get_dashboards)
-    websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     event.async_track_time_interval(hass, send_pushes_regularly, UPDATE_INTERVAL, cancel_on_shutdown=True)
     # Set up the Domika Event Listener
     hass.bus.async_listen("state_changed", forward_event)

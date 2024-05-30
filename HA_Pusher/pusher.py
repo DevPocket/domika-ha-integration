@@ -190,6 +190,18 @@ class Pusher:
 
                 data = res.fetchall()
                 if len(data) == 1:
+                    # We don't want to store token in the integration in the future,
+                    # it's a temp solution until we have a working push server
+                    self.cur.execute("""
+                        UPDATE devices
+                        SET token = ?,
+                            platform = ?,
+                            environment = ?,
+                            last_update = datetime('now')
+                        WHERE app_session_id = ?
+                        ;""", [token, platform, environment, app_session_id])
+                    self.db.commit()
+
                     push_session_id = data[0][1]
                     if push_session_id:
                         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -210,17 +222,6 @@ class Pusher:
 
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
                         if r.status_code == "202" or r.status_code == "204":
-                            # We don't want to store token in the integration in the future,
-                            # it's a temp solution until we have a working push server
-                            self.cur.execute("""
-                                UPDATE devices
-                                SET token = ?,
-                                    platform = ?,
-                                    environment = ?,
-                                    last_update = datetime('now')
-                                WHERE app_session_id = ?
-                                ;""", [token, platform, environment, app_session_id])
-                            self.db.commit()
                             return True
         return False
 
@@ -276,7 +277,8 @@ class Pusher:
                 for entity_id in subscriptions:
                     attributes = subscriptions.get(entity_id)
                     for att in attributes:
-                        data.append((app_session_id, entity_id, att, 0))
+                        # TODO: replace 1 with 0. Temp solution.
+                        data.append((app_session_id, entity_id, att, 1))
 
                 try:
                     self.cur.execute("DELETE FROM subscriptions WHERE app_session_id = ? ;", [app_session_id])

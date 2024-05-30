@@ -207,7 +207,9 @@ async def websocket_domika_verify_push_session(
             res_dict = dict(json.loads(r.text))
             push_session_id = res_dict.get("push_session_id")
 
-        if r.status_code == "201" and push_session_id:
+        LOGGER.debug(f"verify_push_session push_session_id: {push_session_id}, code: {r.status_code}")
+        if str(r.status_code) == "201" and push_session_id:
+            LOGGER.debug(f"verify_push_session saving push_session")
             pusher.save_push_session(app_session_id, push_session_id)
         pusher.close_connection()
 

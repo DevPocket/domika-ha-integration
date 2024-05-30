@@ -40,7 +40,9 @@ def websocket_domika_critical_sensors(
         return
 
     LOGGER.debug('Got websocket message "critical_sensors", data: %s', msg)
+
     sensors_data = get(hass)
     result = sensors_data.to_dict()
-    LOGGER.debug('### %s', result)
+
     connection.send_result(msg_id, result)
+    LOGGER.debug('critical_sensors msg_id=%s data=%s', msg_id, result)

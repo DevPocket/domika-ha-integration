@@ -64,13 +64,10 @@ async def websocket_domika_update_app_session(
 
     async with AsyncSessionFactory() as session:
         app_session_id = await update_app_session_id(session, app_session_id, connection.user.id)
+        LOGGER.info('Successfully updated app session id "%s".', app_session_id)
 
     connection.send_result(msg_id, {'app_session_id': app_session_id})
-    LOGGER.debug(
-        'update_app_session msg_id=%s data=%s',
-        msg_id,
-        {'app_session_id': app_session_id},
-    )
+    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': app_session_id})
 
 
 async def _check_push_token(
@@ -94,13 +91,9 @@ async def _check_push_token(
                     'd.type': 'push_activation',
                     'push_activation_success': True,
                 }
-                LOGGER.debug('Push token "%s" check. OK', push_token_hex)
+                LOGGER.info('Push token "%s" check. OK', push_token_hex)
             else:
-                event_result = {
-                    'd.type': 'push_activation',
-                    'push_activation_success': False,
-                }
-                LOGGER.debug('Push token "%s" check. Need validation', push_token_hex)
+                LOGGER.info('Push token "%s" check. Need validation', push_token_hex)
     except errors.AppSessionIdNotFoundError:
         LOGGER.error(
             'Can\'t check push token "%s". App session id "%s" not found',
@@ -113,7 +106,7 @@ async def _check_push_token(
         }
     except push_server_errors.PushSessionIdNotFoundError as e:
         if e.push_session_id is None:
-            LOGGER.debug('Can\'t check push token "%s". Missing push session id', push_token_hex)
+            LOGGER.info('Can\'t check push token "%s". Missing push session id', push_token_hex)
         else:
             LOGGER.error('Can\'t check push token "%s". %s', push_token_hex, e)
         event_result = {

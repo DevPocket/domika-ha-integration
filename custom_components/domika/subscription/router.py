@@ -12,6 +12,7 @@ import logging
 import uuid
 from typing import Any, cast
 
+import sqlalchemy.exc
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import async_response, websocket_command
@@ -48,8 +49,7 @@ async def websocket_domika_resubscribe(
     app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
 
     res_list = []
-
-    subscriptions = cast(dict[str, set], msg.get('subscriptions'))  # Required in command schema.
+    subscriptions = cast(dict[str, set], msg.get('subscriptions'))
     for entity_id in subscriptions:
         state = hass.states.get(entity_id)
         if state:
@@ -69,11 +69,15 @@ async def websocket_domika_resubscribe(
                 'websocket_domika_resubscribe requesting state of unknown entity: %s',
                 entity_id,
             )
-
-    async with AsyncSessionFactory() as session:
-        await resubscribe(session, app_session_id, subscriptions)
-
     connection.send_result(msg_id, {'entities': res_list})
+
+    try:
+        async with AsyncSessionFactory() as session:
+            await resubscribe(session, app_session_id, subscriptions)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error('Can\'t resubscribe "%s". Database error. %s', subscriptions, e)
+    except Exception as e:
+        LOGGER.exception('Can\'t resubscribe "%s". Unhandled error. %s', subscriptions, e)
 
 
 @websocket_command(
@@ -97,13 +101,16 @@ async def websocket_domika_resubscribe_push(
 
     LOGGER.debug('Got websocket message "resubscribe_push", data: %s', msg)
 
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('resubscribe_push msg_id=%s data=%s', msg_id, {'result': 'accepted'})
+
     app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
-
-    async with AsyncSessionFactory() as session:
-        await resubscribe_push(
-            session,
-            app_session_id,
-            cast(dict[str, set], msg.get('subscriptions')),
-        )
-
-    connection.send_result(msg_id, {})
+    subscriptions = cast(dict[str, set], msg.get('subscriptions'))
+    try:
+        async with AsyncSessionFactory() as session:
+            await resubscribe_push(session, app_session_id, subscriptions)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error('Can\'t resubscribe push "%s". Database error. %s', subscriptions, e)
+    except Exception as e:
+        LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)

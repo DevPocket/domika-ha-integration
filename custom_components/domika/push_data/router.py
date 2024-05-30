@@ -12,6 +12,7 @@ import logging
 import uuid
 from typing import Any, cast
 
+import sqlalchemy.exc
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import async_response, websocket_command
@@ -45,11 +46,18 @@ async def websocket_domika_confirm_events(
 
     LOGGER.debug('Got websocket message "confirm_event", data: %s', msg)
 
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('confirm_event msg_id=%s data=%s', msg_id, {'result': 'accepted'})
+
     event_ids = cast(list[uuid.UUID], msg.get('event_ids'))
     app_session_id = msg.get('app_session_id')
 
     if event_ids and app_session_id:
-        async with AsyncSessionFactory() as session:
-            await delete(session, event_ids)
-
-    connection.send_result(msg_id, {})
+        try:
+            async with AsyncSessionFactory() as session:
+                await delete(session, event_ids)
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            LOGGER.error('Can\'t confirm events "%s". Database error. %s', event_ids, e)
+        except Exception as e:
+            LOGGER.exception('Can\'t confirm events "%s". Unhandled error. %s', event_ids, e)

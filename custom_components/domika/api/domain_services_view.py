@@ -14,6 +14,7 @@ import logging
 import uuid
 from http import HTTPStatus
 
+import sqlalchemy.exc
 from aiohttp import web
 from homeassistant.components.api import APIDomainServicesView
 
@@ -48,10 +49,17 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
 
         await asyncio.sleep(0.5)
 
-        async with AsyncSessionFactory() as session:
-            result = await ha_entity_service.get(session, app_session_id)
+        try:
+            async with AsyncSessionFactory() as session:
+                result = await ha_entity_service.get(session, app_session_id)
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            LOGGER.error('DomikaAPIDomainServicesView post. Database error. %s', e)
+            return self.json_message('Database error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            LOGGER.exception('DomikaAPIDomainServicesView post. Unhandled error. %s', e)
+            return self.json_message('Internal error.', HTTPStatus.INTERNAL_SERVER_ERROR)
 
         data = json.dumps({'entities': result})
-        LOGGER.debug('DomikaAPIDomainServicesView data: %s', data)
+        LOGGER.debug('DomikaAPIDomainServicesView data: %s', {'entities': result})
         response.body = data.encode()
         return response

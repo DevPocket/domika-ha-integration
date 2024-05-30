@@ -428,3 +428,23 @@ def websocket_domika_get_dashboards(
         msg.get("id"), dashboards_dict
     )
     pusher.close_connection()
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "domika/entity_list",
+        vol.Required("domains"): list,
+    }
+)
+@websocket_api.async_response
+async def websocket_domika_entity_list(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika request."""
+    LOGGER.debug(f'Got websocket message "entity_list", user: {connection.user.id}')
+    domains = msg.get("domains")
+    connection.send_result(
+        msg.get("id"), await get_entity_list(hass, domains)
+    )

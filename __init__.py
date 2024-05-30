@@ -53,6 +53,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, websocket_domika_critical_sensors)
     websocket_api.async_register_command(hass, websocket_domika_update_dashboards)
     websocket_api.async_register_command(hass, websocket_domika_get_dashboards)
+    websocket_api.async_register_command(hass, websocket_domika_entity_list)
     event.async_track_time_interval(hass, send_pushes_regularly, UPDATE_INTERVAL, cancel_on_shutdown=True)
     # Set up the Domika Event Listener
     hass.bus.async_listen("state_changed", forward_event)

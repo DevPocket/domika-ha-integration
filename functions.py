@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import requests
+from homeassistant.components.search import Searcher, ItemType
 from homeassistant.helpers import (
     config_validation as cv,
     entity_registry as er,
+    entity as hass_entity,
     json as js,
 )
 from .const import *
@@ -87,6 +89,24 @@ def get_critical_sensors(hass) -> dict:
     res = {"sensors": sensors_list, "sensors_on": sensors_on_list}
     return res
 
+
+async def get_entity_list(hass, domains) -> dict:
+    entity_ids = hass.states.async_entity_ids(domains)
+    result = dict()
+    for entity_id in entity_ids:
+        state = hass.states.get(entity_id)
+        searcher = Searcher(hass, hass_entity.entity_sources(hass))
+        result[entity_id] = dict()
+        result[entity_id]["name"] = state.attributes.get("friendly_name") or state.name
+
+        related_1 = searcher.async_search(ItemType.ENTITY, entity_id)
+        if related_1 and "device" in related_1:
+            related_device_id = related_1["device"].pop()
+            related_2 = searcher.async_search(ItemType.DEVICE, related_device_id)
+            if related_2 and "entity" in related_2:
+                result[entity_id]["related"] = related_2["entity"]
+
+    return result
 
 def make_post_request(url, json_payload, additional_headers=None):
     headers = {"Content-Type": "application/json", "Accept": "application/json"}

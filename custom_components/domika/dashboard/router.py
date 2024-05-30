@@ -11,6 +11,7 @@ Author(s): Artem Bezborodko
 import logging
 from typing import Any, cast
 
+import sqlalchemy.exc
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import async_response, websocket_command
@@ -23,6 +24,50 @@ from .models import DomikaDashboardCreate, DomikaDashboardRead
 from .service import create_or_update, get
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+
+
+async def _update_dashboards(
+    hass: HomeAssistant,
+    dashboards: str,
+    hash_: str,
+    user_id: str,
+):
+    try:
+        async with AsyncSessionFactory() as session:
+            await create_or_update(
+                session,
+                DomikaDashboardCreate(
+                    dashboards=dashboards,
+                    hash=hash_,
+                    user_id=user_id,
+                ),
+            )
+
+            devices = await device_service.get_by_user_id(session, user_id)
+
+        for device in devices:
+            LOGGER.debug('### domika_%s, dashboard_update', device.app_session_id)
+            hass.bus.async_fire(
+                f'domika_{device.app_session_id}',
+                {
+                    'd.type': 'dashboard_update',
+                    'hash': hash_,
+                },
+            )
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error(
+            'Can\'t update dashboards "%s" for user "%s". Database error. %s',
+            dashboards,
+            user_id,
+            e,
+        )
+    except Exception as e:
+        LOGGER.exception(
+            'Can\'t update dashboards "%s" for user "%s". Unhandled error. %s',
+            dashboards,
+            user_id,
+            e,
+        )
 
 
 @websocket_command(
@@ -50,32 +95,18 @@ async def websocket_domika_update_dashboards(
         msg,
     )
 
-    hash_ = cast(str, msg.get('hash'))  # Required in command schema.
-    async with AsyncSessionFactory() as session:
-        await create_or_update(
-            session,
-            DomikaDashboardCreate(
-                dashboards=cast(str, msg.get('dashboards')),  # Required in command schema.
-                hash=hash_,
-                user_id=connection.user.id,
-            ),
-        )
+    # Fast send reply.
+    connection.send_result(msg_id, {'result': 'accepted'})
+    LOGGER.debug('update_dashboards msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
-        devices = await device_service.get_by_user_id(session, connection.user.id)
-
-    for device in devices:
-        LOGGER.debug('### domika_%s, dashboard_update', device.app_session_id)
-        hass.bus.async_fire(
-            f'domika_{device.app_session_id}',
-            {
-                'd.type': 'dashboard_update',
-                'hash': hash_,
-            },
-        )
-
-    connection.send_result(
-        msg_id,
-        {},
+    hass.async_create_task(
+        _update_dashboards(
+            hass,
+            cast(str, msg.get('dashboards')),
+            cast(str, msg.get('hash')),
+            connection.user.id,
+        ),
+        'update_dashboards',
     )
 
 
@@ -101,15 +132,28 @@ async def websocket_domika_get_dashboards(
         msg,
         connection.user.id,
     )
-    async with AsyncSessionFactory() as session:
-        dashboards = await get(session, connection.user.id)
 
-    # LOGGER.debug('>>> %s', dashboards.dict() if dashboards else '')
+    try:
+        async with AsyncSessionFactory() as session:
+            dashboards = await get(session, connection.user.id)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error(
+            'Can\'t get dashboards for user "%s". Database error. %s',
+            connection.user.id,
+            e,
+        )
+    except Exception as e:
+        LOGGER.exception(
+            'Can\'t get dashboards for user "%s". Unhandled error. %s',
+            connection.user.id,
+            e,
+        )
 
-    # TODO: it is better to return None if there are no dashboards found.
-    connection.send_result(
-        msg_id,
+    result = (
         DomikaDashboardRead.from_dict(dashboards.dict()).to_dict()
         if dashboards
-        else DomikaDashboardRead(dashboards='', hash=''),
+        else DomikaDashboardRead(dashboards='', hash='').to_dict()
     )
+
+    connection.send_result(msg_id, result)
+    LOGGER.debug('update_dashboards msg_id=%s data=%s', msg_id, result)

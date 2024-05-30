@@ -64,6 +64,7 @@ class DomikaPushDataBase(DataClassJSONMixin):
     attribute: str
     value: str
     context_id: str
+    timestamp: int
 
 
 @dataclass

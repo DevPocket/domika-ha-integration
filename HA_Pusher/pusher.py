@@ -221,7 +221,7 @@ class Pusher:
                         r = requests.request("post", url, json=payload, headers=headers)
 
                         push_logger.log_debug(f"check_push_session result: {r.text}, {r.status_code}")
-                        if r.status_code == "202" or r.status_code == "204":
+                        if r.status_code == 202 or r.status_code == 204:
                             return True
         return False
 

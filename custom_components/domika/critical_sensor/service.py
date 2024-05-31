@@ -12,7 +12,7 @@ from typing import cast
 
 import homeassistant.helpers.entity_registry
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_ON
-from homeassistant.core import HomeAssistant, State
+from homeassistant.core import HomeAssistant
 
 from ..const import CRITICAL_SENSORS_DEVICE_CLASSES, SENSORS_DOMAIN, WARNING_SENSORS_DEVICE_CLASSES
 from .enums import CriticalityLevel
@@ -121,24 +121,3 @@ def criticality_level(
         ),
         None,
     )
-
-
-def get_critical_sensor_state(hass: HomeAssistant, entity_id: str) -> State | None:
-    """
-    Get critical sensor state by entity_id.
-
-    Args:
-        hass: homeassistant core object.
-        entity_id: homeassistant entity id.
-
-    Returns:
-        critical sensor state if entity_id correspond to critical sensors, None otherwise.
-    """
-    sensor = hass.states.get(entity_id)
-
-    if sensor:
-        device_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
-        if device_class in CRITICAL_SENSORS_DEVICE_CLASSES:
-            return sensor
-
-    return None

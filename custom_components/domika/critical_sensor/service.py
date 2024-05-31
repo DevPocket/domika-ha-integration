@@ -14,11 +14,17 @@ import homeassistant.helpers.entity_registry
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_ON
 from homeassistant.core import HomeAssistant, State
 
-from ..const import SENSORS_DEVICE_CLASSES, SENSORS_DOMAIN
+from ..const import CRITICAL_SENSORS_DEVICE_CLASSES, SENSORS_DOMAIN, WARNING_SENSORS_DEVICE_CLASSES
+from .enums import CriticalityLevel
 from .models import DomikaCriticalSensor, DomikaCriticalSensorsRead
 
+CRITICALITY_LEVEL_TO_CLASSES = {
+    CriticalityLevel.CRITICAL: CRITICAL_SENSORS_DEVICE_CLASSES,
+    CriticalityLevel.WARNING: WARNING_SENSORS_DEVICE_CLASSES,
+}
 
-def get(hass: HomeAssistant) -> DomikaCriticalSensorsRead:
+
+def get(hass: HomeAssistant, criticality_levels: CriticalityLevel) -> DomikaCriticalSensorsRead:
     """Get sate of the critical sensors."""
     result = DomikaCriticalSensorsRead([], [])
 
@@ -27,41 +33,99 @@ def get(hass: HomeAssistant) -> DomikaCriticalSensorsRead:
 
     for entity_id in entity_ids:
         entity = entity_registry.entities.get(entity_id)
-        # TODO: Log message here?
-        if not entity:
+        if not entity or entity.hidden_by or entity.disabled_by:
             continue
 
-        if entity.hidden_by or entity.disabled_by:
+        sensor_criticality_level = criticality_level(hass, entity_id)
+        if sensor_criticality_level is None or sensor_criticality_level not in criticality_levels:
             continue
 
-        critical_sensor_state = get_critical_sensor_state(hass, entity_id)
-        if not critical_sensor_state:
+        sensor_state = hass.states.get(entity_id)
+        if not sensor_state:
             continue
 
         result.sensors.append(
             DomikaCriticalSensor(
                 entity_id=entity_id,
-                name=critical_sensor_state.name,
-                device_class=cast(str, critical_sensor_state.attributes.get(ATTR_DEVICE_CLASS)),
-                state=critical_sensor_state.state,
+                name=sensor_state.name,
+                type=sensor_criticality_level,
+                device_class=cast(str, sensor_state.attributes.get(ATTR_DEVICE_CLASS)),
+                state=sensor_state.state,
                 timestamp=int(
                     max(
-                        critical_sensor_state.last_updated_timestamp,
-                        critical_sensor_state.last_changed_timestamp,
+                        sensor_state.last_updated_timestamp,
+                        sensor_state.last_changed_timestamp,
                     )
                     * 1e6,
                 ),
             ),
         )
-        if critical_sensor_state.state == STATE_ON:
+        if sensor_state.state == STATE_ON:
             result.sensors_on.append(entity_id)
 
     return result
 
 
+def is_critical(hass: HomeAssistant, entity_id: str, criticality_levels: CriticalityLevel) -> bool:
+    """
+    Check if entity is critical binary sensor with one of wanted criticality level.
+
+    Args:
+        hass: homeassistant core object.
+        entity_id: homeassistant entity id.
+        criticality_levels: wanted criticality levels flags.
+
+    Returns:
+        True if entity_id correspond to critical sensors, False otherwise.
+    """
+    if not entity_id.startswith('binary_sensor.'):
+        return False
+
+    sensor = hass.states.get(entity_id)
+    if not sensor:
+        return False
+
+    sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
+
+    return any(sensor_class in CRITICALITY_LEVEL_TO_CLASSES[level] for level in criticality_levels)
+
+
+def criticality_level(
+    hass: HomeAssistant,
+    entity_id: str,
+) -> CriticalityLevel | None:
+    """
+    Get criticality level for binary sensor entity.
+
+    Args:
+        hass: homeassistant core object.
+        entity_id: homeassistant entity id.
+
+    Returns:
+        entitie's criticality level if entity is critical binary sensor, None otherwise.
+    """
+    if not entity_id.startswith('binary_sensor.'):
+        return None
+
+    sensor = hass.states.get(entity_id)
+    if not sensor:
+        return None
+
+    sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
+
+    return next(
+        (
+            level
+            for level in CriticalityLevel.ANY
+            if sensor_class in CRITICALITY_LEVEL_TO_CLASSES[level]
+        ),
+        None,
+    )
+
+
 def get_critical_sensor_state(hass: HomeAssistant, entity_id: str) -> State | None:
     """
-    Get critical sensor state by id.
+    Get critical sensor state by entity_id.
 
     Args:
         hass: homeassistant core object.
@@ -72,10 +136,9 @@ def get_critical_sensor_state(hass: HomeAssistant, entity_id: str) -> State | No
     """
     sensor = hass.states.get(entity_id)
 
-    # TODO: Log message here?
     if sensor:
         device_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
-        if device_class in SENSORS_DEVICE_CLASSES:
+        if device_class in CRITICAL_SENSORS_DEVICE_CLASSES:
             return sensor
 
     return None

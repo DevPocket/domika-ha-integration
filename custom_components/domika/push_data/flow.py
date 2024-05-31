@@ -11,7 +11,7 @@ Author(s): Artem Bezborodko
 import json
 import logging
 import uuid
-from typing import Any, Sequence
+from typing import Sequence
 
 import aiohttp
 import sqlalchemy
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from ..critical_sensor import service as critical_sensor_service
+from ..critical_sensor.enums import CriticalityLevel
 from ..database.core import AsyncSessionFactory
 from ..device import service as device_service
 from ..device.models import Device, DomikaDeviceUpdate
@@ -86,20 +87,18 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
         return
 
     # Fire event for application if critical sensor changed it's state.
-    if entity_id.startswith('binary_sensor.'):
-        # If entity id is a critical sensor
-        critical_sensor_state = critical_sensor_service.get_critical_sensor_state(hass, entity_id)
-        if critical_sensor_state:
-            # Fetch state for all critical binary sensors.
-            sensors_data = critical_sensor_service.get(hass)
-            # Fire the event for app.
-            hass.bus.async_fire(
-                DOMIKA_CRITICAL_SENSOR_CHANGED,
-                sensors_data.to_dict(),
-                event.origin,
-                event.context,
-                event.time_fired.timestamp(),
-            )
+    if critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL):
+        # If entity id is a critical binary sensor.
+        # Fetch state for all levels of critical binary sensors.
+        sensors_data = critical_sensor_service.get(hass, CriticalityLevel.ANY)
+        # Fire the event for app.
+        hass.bus.async_fire(
+            DOMIKA_CRITICAL_SENSOR_CHANGED,
+            sensors_data.to_dict(),
+            event.origin,
+            event.context,
+            event.time_fired.timestamp(),  # TODO: convert to int?
+        )
 
     # Store events into db.
     event_id = uuid.uuid4()
@@ -184,65 +183,61 @@ async def _send_push_data(
         raise push_server_errors.PushServerError(str(e)) from None
 
 
-async def _push_ios(db_session: AsyncSession):
-    # TODO: add check for elapsed time.
-    stmt = sqlalchemy.select(PushData, Device.push_session_id)
-    stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
-    stmt = stmt.where(Device.push_session_id.is_not(None))
-    stmt = stmt.group_by(
-        PushData.app_session_id,
-        PushData.entity_id,
-        PushData.attribute,
-    )
-    stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
-    stmt = stmt.order_by(
-        PushData.app_session_id,
-        Device.push_token,
-        PushData.entity_id,
-    )
-    events = (await db_session.execute(stmt)).all()
-
-    events_dict = {}
-    current_entity_id: str | None = None
-    current_push_session_id: uuid.UUID | None = None
-    current_app_session_id: uuid.UUID | None = None
-
-    entity = {}
-    for event in events:
-        if current_push_session_id != event[1]:
-            current_push_session_id = event[1]
-            current_app_session_id = event[0].app_session_id
-            if events_dict and current_push_session_id:
-                LOGGER.debug('Push ios events. %s', events_dict)
-                await _send_push_data(
-                    db_session,
-                    current_app_session_id,  # type: ignore
-                    current_push_session_id,
-                    events_dict,
-                )
-            current_entity_id = None
-            events_dict = {}
-        if current_entity_id != event[0].entity_id:
-            entity = {}
-            events_dict[event[0].entity_id] = entity
-            current_entity_id = event[0].entity_id
-        entity[event[0].attribute] = {
-            'v': event[0].value,
-            't': event[0].timestamp,
-        }
-
-    if events_dict and current_push_session_id:
-        LOGGER.debug('Push ios events. %s', events_dict)
-        await _send_push_data(
-            db_session,
-            current_app_session_id,  # type: ignore
-            current_push_session_id,
-            events_dict,
-        )
-
-    # await delete_for_platform(db_session, IOS_PLATFORM)
-
-
 async def push_registered_events():
     async with AsyncSessionFactory() as session:
-        await _push_ios(session)
+        # TODO: add check for elapsed time.
+        stmt = sqlalchemy.select(PushData, Device.push_session_id)
+        stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
+        stmt = stmt.where(Device.push_session_id.is_not(None))
+        stmt = stmt.group_by(
+            PushData.app_session_id,
+            PushData.entity_id,
+            PushData.attribute,
+        )
+        stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
+        stmt = stmt.order_by(
+            PushData.app_session_id,
+            Device.push_token,
+            PushData.entity_id,
+        )
+        events = (await session.execute(stmt)).all()
+
+        events_dict = {}
+        current_entity_id: str | None = None
+        current_push_session_id: uuid.UUID | None = None
+        current_app_session_id: uuid.UUID | None = None
+
+        entity = {}
+        for event in events:
+            if current_push_session_id != event[1]:
+                current_push_session_id = event[1]
+                current_app_session_id = event[0].app_session_id
+                if events_dict and current_push_session_id:
+                    LOGGER.debug('Push ios events. %s', events_dict)
+                    await _send_push_data(
+                        session,
+                        current_app_session_id,  # type: ignore
+                        current_push_session_id,
+                        events_dict,
+                    )
+                current_entity_id = None
+                events_dict = {}
+            if current_entity_id != event[0].entity_id:
+                entity = {}
+                events_dict[event[0].entity_id] = entity
+                current_entity_id = event[0].entity_id
+            entity[event[0].attribute] = {
+                'v': event[0].value,
+                't': event[0].timestamp,
+            }
+
+        if events_dict and current_push_session_id:
+            LOGGER.debug('Push ios events. %s', events_dict)
+            await _send_push_data(
+                session,
+                current_app_session_id,  # type: ignore
+                current_push_session_id,
+                events_dict,
+            )
+
+        # await delete_for_platform(db_session, IOS_PLATFORM)

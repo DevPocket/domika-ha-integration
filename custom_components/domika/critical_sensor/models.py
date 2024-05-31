@@ -8,9 +8,11 @@ Critical sensor.
 Author(s): Artem Bezborodko
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from mashumaro.mixins.json import DataClassJSONMixin
+
+from .enums import CriticalityLevel
 
 
 @dataclass
@@ -18,6 +20,7 @@ class DomikaCriticalSensor(DataClassJSONMixin):
     """Critical sensor data."""
 
     entity_id: str
+    type: CriticalityLevel = field(metadata={'serialize': lambda v: v.to_string()})
     name: str
     device_class: str
     state: str

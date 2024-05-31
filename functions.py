@@ -91,20 +91,38 @@ def get_critical_sensors(hass) -> dict:
 
 
 async def get_entity_list(hass, domains) -> dict:
+    def related(entity_id) -> set[str]:
+        searcher = Searcher(hass, hass_entity.entity_sources(hass))
+        related_devices = searcher.async_search(ItemType.ENTITY, entity_id)
+        if related_devices and "device" in related_devices:
+            related_device_id = related_devices["device"].pop()
+            related_entities = searcher.async_search(ItemType.DEVICE, related_device_id)
+            if related_entities and "entity" in related_entities:
+                return related_entities["entity"]
+            else:
+                return set()
+
     entity_ids = hass.states.async_entity_ids(domains)
     result = dict()
     for entity_id in entity_ids:
         state = hass.states.get(entity_id)
-        searcher = Searcher(hass, hass_entity.entity_sources(hass))
         result[entity_id] = dict()
         result[entity_id]["name"] = state.attributes.get("friendly_name") or state.name
 
-        related_1 = searcher.async_search(ItemType.ENTITY, entity_id)
-        if related_1 and "device" in related_1:
-            related_device_id = related_1["device"].pop()
-            related_2 = searcher.async_search(ItemType.DEVICE, related_device_id)
-            if related_2 and "entity" in related_2:
-                result[entity_id]["related"] = related_2["entity"]
+        related_ids = dict()
+        if entity_id.startswith("lock."):
+            for related_id in related(entity_id):
+                state = hass.states.get(related_id)
+                if ("device_class" in state.attributes) and (state.attributes["device_class"] in [ "door", "garageDoor", "window", "battery" ]):
+                    related_ids[state.attributes["device_class"]] = related_id
+        elif entity_id.startswith("climate."):
+            for related_id in related(entity_id):
+                state = hass.states.get(related_id)
+                if ("device_class" in state.attributes) and (state.attributes["device_class"] in [ "temperature", "humidity" ]):
+                    related_ids[state.attributes["device_class"]] = related_id
+
+        if related_ids:
+            result[entity_id]["related"] = related_ids
 
     return result
 

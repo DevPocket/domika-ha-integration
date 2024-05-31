@@ -22,16 +22,7 @@ else:
     PUSH_SERVER_URL = 'https://domika.app'
     PUSH_INTERVAL = timedelta(minutes=15)
 
-# Event confirmation records will stay at least 15 seconds
-EVENT_CONFIRMATION_EXPIRATION_TIME = 15 * 1e6
-
-IOS_PLATFORM = 'ios'
-IOS_SANDBOX_ENV = 'sandbox'
-IOS_PRODUCTION_ENV = 'production'
-
-ANDROID_PLATFORM = 'android'
-
-# Seonds
+# Seconds
 PUSH_SERVER_TIMEOUT = 10
 
 # Number of days

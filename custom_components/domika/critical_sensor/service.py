@@ -68,7 +68,7 @@ def get_critical_sensor_state(hass: HomeAssistant, entity_id: str) -> State | No
         entity_id: homeassistant entity id.
 
     Returns:
-        critical sensor state if entity_id correcpond to critical sensors, None otherwise.
+        critical sensor state if entity_id correspond to critical sensors, None otherwise.
     """
     sensor = hass.states.get(entity_id)
 

@@ -48,6 +48,13 @@ def _fire_events_to_app_session_ids(
     dict_attributes['event_id'] = event_id
     dict_attributes['entity_id'] = entity_id
     for app_session_id in app_session_ids:
+        hass.bus.async_fire(
+            f'domika_{app_session_id}',
+            dict_attributes,
+            event.origin,
+            event.context,
+            event.time_fired.timestamp(),
+        )
         LOGGER.debug(
             '### domika_%s, %s, %s, %s, %s',
             app_session_id,
@@ -55,13 +62,6 @@ def _fire_events_to_app_session_ids(
             event.origin,
             event.context.id,
             event.time_fired,
-        )
-        hass.bus.async_fire(
-            f'domika_{app_session_id}',
-            dict_attributes,
-            event.origin,
-            event.context,
-            event.time_fired.timestamp(),
         )
 
 
@@ -98,6 +98,14 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
             event.origin,
             event.context,
             event.time_fired.timestamp(),  # TODO: convert to int?
+        )
+        LOGGER.debug(
+            '### %s, %s, %s, %s, %s',
+            DOMIKA_CRITICAL_SENSOR_CHANGED,
+            sensors_data.to_dict(),
+            event.origin,
+            event.context.id,
+            event.time_fired,
         )
 
     # Store events into db.

@@ -4,7 +4,6 @@
 
 **/__pycache__
 **/package.json
-Domika.db
 .env
 
 # AppCode template
@@ -16,13 +15,4 @@ Domika.db
 
 # File-based project format
 *.iws
-/HA_Pusher_events.db
-/HA_Pusher_subscriptions.db
-/.idea/domika-ha-integration.iml
-/HA_Pusher/key.p8
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/inspectionProfiles/Project_Default.xml
-/.idea/vcs.xml
-/Pusher_events.db
+.idea/**

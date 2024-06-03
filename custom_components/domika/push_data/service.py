@@ -173,6 +173,19 @@ async def delete(
         await db_session.commit()
 
 
+async def delete_all(
+    db_session: AsyncSession,
+    *,
+    commit: bool = True,
+):
+    """Delete all push data."""
+    stmt = sqlalchemy.delete(PushData)
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
 async def delete_for_platform(
     db_session: AsyncSession,
     platform: str,

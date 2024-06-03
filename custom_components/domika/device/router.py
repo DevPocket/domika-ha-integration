@@ -104,11 +104,14 @@ async def _check_push_token(
             'd.type': 'push_activation',
             'invalid_app_session_id': True,
         }
+    except errors.PushSessionIdNotFoundError:
+        LOGGER.info('Can\'t check push token "%s". Missing push session id', push_token_hex)
+        event_result = {
+            'd.type': 'push_activation',
+            'push_activation_success': False,
+        }
     except push_server_errors.PushSessionIdNotFoundError as e:
-        if e.push_session_id is None:
-            LOGGER.info('Can\'t check push token "%s". Missing push session id', push_token_hex)
-        else:
-            LOGGER.error('Can\'t check push token "%s". %s', push_token_hex, e)
+        LOGGER.error('Can\'t check push token "%s". %s', push_token_hex, e)
         event_result = {
             'd.type': 'push_activation',
             'push_activation_success': False,

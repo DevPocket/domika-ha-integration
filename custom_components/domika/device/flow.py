@@ -9,6 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import json
+import logging
 import uuid
 
 import aiohttp
@@ -17,9 +18,11 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import errors, push_server_errors, statuses
-from ..const import PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
+from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 from .service import create, get, update
+
+LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
 
 async def update_app_session_id(
@@ -84,6 +87,9 @@ async def check_push_token(
     """
     Check that push session is exists, and associated push token does not changed.
 
+    If push session id is not found on push server - it will be implicitly deleted for device with
+    given app_session_id.
+
     Args:
         db_session: sqlalchemy session.
         app_session_id: application session id.
@@ -96,8 +102,9 @@ async def check_push_token(
 
     Raises:
         errors.AppSessionIdNotFoundError: if app session not found.
+        errors.PushSessionIdNotFoundError: if push_session_id not set for device.
         push_server_errors.PushSessionIdNotFoundError: if push session id not found on the push
-        server.
+            server, or triplet x-session-id/platform/environment do not match.
         push_server_errors.BadRequestError: if push server response with bad request.
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
@@ -107,6 +114,8 @@ async def check_push_token(
         raise errors.AppSessionIdNotFoundError(app_session_id)
 
     push_session_id = device.push_session_id
+    if not push_session_id:
+        raise errors.PushSessionIdNotFoundError(app_session_id)
 
     try:
         async with (
@@ -116,9 +125,7 @@ async def check_push_token(
                 headers={
                     # TODO: rename to x-push-session-id
                     'x-session-id': str(push_session_id),
-                }
-                if push_session_id
-                else None,
+                },
                 json={
                     'push_token': push_token,
                     'platform': platform,
@@ -136,11 +143,20 @@ async def check_push_token(
                 # can ignore verification key.
                 return False
 
-            if resp.status == statuses.HTTP_404_NOT_FOUND:
+            if resp.status in (statuses.HTTP_401_UNAUTHORIZED, statuses.HTTP_404_NOT_FOUND):
                 # Push server can't find push session with given triplet x-session-id/platform/
-                # environment.
+                # environment. Or even can't find push session at all.
                 # Need to remove current push session.
+                LOGGER.info(
+                    'The server rejected push session id "%s"',
+                    push_session_id,
+                )
                 await update(db_session, device, DomikaDeviceUpdate(push_session_id=None))
+                LOGGER.info(
+                    'Push session "%s" for app session "%s" successfully removed',
+                    push_session_id,
+                    app_session_id,
+                )
                 raise push_server_errors.PushSessionIdNotFoundError(push_session_id)
 
             if resp.status == statuses.HTTP_400_BAD_REQUEST:
@@ -264,6 +280,8 @@ async def verify_push_session(
     """
     Finishes push session generation.
 
+    After successfull generation store new push session id for device with given app_session_id.
+
     Args:
         db_session: sqlalchemy session.
         app_session_id: application session id.
@@ -290,12 +308,6 @@ async def verify_push_session(
             aiohttp.ClientSession(json_serialize=json.dumps) as session,
             session.post(
                 f'{PUSH_SERVER_URL}/push_session/verify',
-                headers={
-                    # TODO: rename to x-push-session-id
-                    'x-session-id': str(device.push_session_id),
-                }
-                if device.push_session_id
-                else None,
                 json={
                     'verification_key': verification_key,
                 },

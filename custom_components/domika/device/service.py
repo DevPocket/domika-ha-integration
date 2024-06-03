@@ -24,6 +24,12 @@ async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | N
     return await db_session.scalar(stmt)
 
 
+async def get_all_with_push_session_id(db_session: AsyncSession) -> Sequence[Device]:
+    """Get device by application sesison id."""
+    stmt = select(Device).where(Device.push_session_id.is_not(None))
+    return (await db_session.scalars(stmt)).all()
+
+
 async def get_by_user_id(db_session: AsyncSession, user_id: str) -> Sequence[Device]:
     """Get device by user id."""
     stmt = select(Device).where(Device.user_id == user_id)

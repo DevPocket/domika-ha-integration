@@ -28,7 +28,7 @@ from ..device.models import Device, DomikaDeviceUpdate
 from ..subscription.flow import get_app_session_id_by_attributes
 from ..utils import flatten_json
 from .models import DomikaPushDataCreate, PushData
-from .service import create
+from .service import create, delete_all
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -86,8 +86,10 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     if not attributes:
         return
 
+    is_critical = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL)
+
     # Fire event for application if critical sensor changed it's state.
-    if critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL):
+    if is_critical:
         # If entity id is a critical binary sensor.
         # Fetch state for all levels of critical binary sensors.
         sensors_data = critical_sensor_service.get(hass, CriticalityLevel.ANY)
@@ -123,24 +125,56 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
         for attribute in attributes
     ]
     async with AsyncSessionFactory() as session:
+        # Create push_data.
         await create(session, push_data)
         app_session_ids = await get_app_session_id_by_attributes(
             session,
             entity_id,
             [attribute[0] for attribute in attributes],
         )
+        # If any app_session_ids are subscribed for these attributes - fire the event to those
+        # app_session_ids for app to catch.
+        if app_session_ids:
+            _fire_events_to_app_session_ids(
+                hass,
+                event,
+                event_id,
+                entity_id,
+                attributes,
+                app_session_ids,
+            )
 
-    # If any app_session_ids are subscribed for these attributes - fire the event to those
-    # app_session_ids for app to catch.
-    if app_session_ids:
-        _fire_events_to_app_session_ids(
-            hass,
-            event,
-            event_id,
-            entity_id,
-            attributes,
-            app_session_ids,
-        )
+        if is_critical:
+            verified_devices = await device_service.get_all_with_push_session_id(session)
+
+            # Create events dict for critical push.
+            # Format example:
+            # '{
+            # '  "binary_sensor.smoke": {
+            # '    "s": {
+            # '      "v": "on",
+            # '        "t": 717177272
+            # '     }
+            # '  }
+            # '}
+            events_dict = {}
+            entity = {}
+            events_dict[entity_id] = entity
+            for pd in push_data:
+                entity[pd.attribute] = {
+                    'v': pd.value,
+                    't': pd.timestamp,
+                }
+
+            for device in verified_devices:
+                await _send_push_data(
+                    session,
+                    device.app_session_id,
+                    # get_all_with_push_session_id return devices with filled push_session_id.
+                    device.push_session_id,  # type: ignore
+                    events_dict,
+                    critical=True,
+                )
 
 
 async def _send_push_data(
@@ -148,12 +182,18 @@ async def _send_push_data(
     app_session_id: uuid.UUID,
     push_session_id: uuid.UUID,
     events_dict: dict,
+    *,
+    critical: bool = False,
 ):
+    LOGGER.debug('Push %sevents. %s', 'critical ' if critical else '', events_dict)
+
     try:
         async with (
             aiohttp.ClientSession(json_serialize=json.dumps) as session,
             session.post(
-                f'{PUSH_SERVER_URL}/notification/push',
+                f'{PUSH_SERVER_URL}/notification/critical_push'
+                if critical
+                else f'{PUSH_SERVER_URL}/notification/push',
                 headers={
                     # TODO: rename to x-push-session-id
                     'x-session-id': str(push_session_id),
@@ -171,13 +211,17 @@ async def _send_push_data(
                 # Remove push session id for device.
                 device = await device_service.get(db_session, app_session_id)
                 if device:
+                    LOGGER.info(
+                        'The server rejected push session id "%s"',
+                        push_session_id,
+                    )
                     await device_service.update(
                         db_session,
                         device,
                         DomikaDeviceUpdate(push_session_id=None),
                     )
                     LOGGER.info(
-                        'Push session "%s" for app session "%s" successfully removed.',
+                        'Push session "%s" for app session "%s" successfully removed',
                         push_session_id,
                         app_session_id,
                     )
@@ -210,6 +254,22 @@ async def push_registered_events():
         )
         events = (await session.execute(stmt)).all()
 
+        # Create events dict.
+        # Format example:
+        # '{
+        # '  "binary_sensor.smoke": {
+        # '    "s": {
+        # '       "v": "on",
+        # '       "t": 717177272
+        # '     }
+        # '  },
+        # '  "light.light": {
+        # '    "s": {
+        # '       "v": "off",
+        # '       "t": 717145367
+        # '     }
+        # '  },
+        # '}
         events_dict = {}
         current_entity_id: str | None = None
         current_push_session_id: uuid.UUID | None = None
@@ -221,7 +281,6 @@ async def push_registered_events():
                 current_push_session_id = event[1]
                 current_app_session_id = event[0].app_session_id
                 if events_dict and current_push_session_id:
-                    LOGGER.debug('Push ios events. %s', events_dict)
                     await _send_push_data(
                         session,
                         current_app_session_id,  # type: ignore
@@ -240,7 +299,6 @@ async def push_registered_events():
             }
 
         if events_dict and current_push_session_id:
-            LOGGER.debug('Push ios events. %s', events_dict)
             await _send_push_data(
                 session,
                 current_app_session_id,  # type: ignore
@@ -248,4 +306,4 @@ async def push_registered_events():
                 events_dict,
             )
 
-        # await delete_for_platform(db_session, IOS_PLATFORM)
+        await delete_all(session)

@@ -27,7 +27,7 @@ class Device(AsyncBase):
 
     app_session_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     user_id: Mapped[str]
-    push_session_id: Mapped[uuid.UUID] = mapped_column(default=None, nullable=True)
+    push_session_id: Mapped[uuid.UUID | None] = mapped_column(default=None, nullable=True)
     push_token: Mapped[str]
     platform: Mapped[str]
     environment: Mapped[str]

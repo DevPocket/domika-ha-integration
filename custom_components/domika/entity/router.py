@@ -24,8 +24,8 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
 @websocket_command(
     {
-        vol.Required('type'): 'domika/entity_list',
-        vol.Required('domains'): list,
+        vol.Required("type"): "domika/entity_list",
+        vol.Required("domains"): list,
     },
 )
 @callback
@@ -35,16 +35,16 @@ def websocket_domika_entity_list(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika entity_list request."""
-    msg_id = msg.get('id')
+    msg_id = msg.get("id")
     if not msg_id:
         LOGGER.error('Got websocket message "entity_list", msg_id is missing.')
         return
 
     LOGGER.debug('Got websocket message "entity_list", data: %s', msg)
 
-    domains_list = cast(list, msg.get('domains'))
+    domains_list = cast(list, msg.get("domains"))
     entities = get(hass, domains_list)
     result = entities.to_dict()
 
     connection.send_result(msg_id, result)
-    LOGGER.debug('entity_list msg_id=%s data=%s', msg_id, result)
+    LOGGER.debug("entity_list msg_id=%s data=%s", msg_id, result)

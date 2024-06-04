@@ -28,7 +28,7 @@ indent-width = 4
 target-version = "py312"
 
 [format]
-quote-style = "single"
+quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 

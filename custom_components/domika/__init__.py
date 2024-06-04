@@ -22,7 +22,8 @@ from .database.manage import migrate
 from .device import router as device_router
 from .push_data import router as push_data_router
 from .push_data.flow import push_registered_events, register_event
-from .subscription import router as subscrioption_router
+from .subscription import router as subscription_router
+from .entity import router as entity_router
 
 # Importing database models to fill sqlalchemy metadata.
 # isort: off
@@ -83,6 +84,7 @@ async def _on_homeassistant_started(hass: HomeAssistant, _event: Event):
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     """Set up component."""
+    # TODO: The real logger configuration is in yaml. Here we need to have the default, which is Warning or Error
     LOGGER.setLevel(logging.DEBUG)
 
     LOGGER.debug('Async setup.')
@@ -98,10 +100,10 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, device_router.websocket_domika_update_push_session)
     websocket_api.async_register_command(hass, device_router.websocket_domika_verify_push_session)
     websocket_api.async_register_command(hass, device_router.websocket_domika_remove_push_session)
-    websocket_api.async_register_command(hass, subscrioption_router.websocket_domika_resubscribe)
+    websocket_api.async_register_command(hass, subscription_router.websocket_domika_resubscribe)
     websocket_api.async_register_command(
         hass,
-        subscrioption_router.websocket_domika_resubscribe_push,
+        subscription_router.websocket_domika_resubscribe_push,
     )
     websocket_api.async_register_command(hass, push_data_router.websocket_domika_confirm_events)
     websocket_api.async_register_command(
@@ -110,6 +112,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     )
     websocket_api.async_register_command(hass, dashboard_router.websocket_domika_update_dashboards)
     websocket_api.async_register_command(hass, dashboard_router.websocket_domika_get_dashboards)
+    websocket_api.async_register_command(hass, entity_router.websocket_domika_entity_list)
 
     # Register homeassistant startup callback.
     hass.bus.async_listen_once(

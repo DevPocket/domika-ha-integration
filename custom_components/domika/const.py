@@ -11,7 +11,8 @@ LOGGER = logging.getLogger(__name__)
 DOMAIN = 'Domika'
 MAIN_LOGGER_NAME = DOMAIN
 
-ALEMBIC_INI_PATH = 'config/custom_components/domika/alembic.ini'
+# ALEMBIC_INI_PATH = 'config/custom_components/domika/alembic.ini'
+ALEMBIC_INI_PATH = 'custom_components/domika/alembic.ini'
 
 if os.getenv('DOMIKA_DEBUG') == '1':
     DATABASE_URL = os.getenv('DOMIKA_DATABASE_URL')

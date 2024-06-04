@@ -25,7 +25,7 @@ CRITICALITY_LEVEL_TO_CLASSES = {
 
 
 def get(hass: HomeAssistant, criticality_levels: CriticalityLevel) -> DomikaCriticalSensorsRead:
-    """Get sate of the critical sensors."""
+    """Get state of the critical sensors."""
     result = DomikaCriticalSensorsRead([], [])
 
     entity_ids = hass.states.async_entity_ids(SENSORS_DOMAIN)

@@ -12,7 +12,7 @@ import enum
 
 
 class CriticalityLevel(enum.Flag):
-    """Critical senson criticality level."""
+    """Critical sensor criticality level."""
 
     CRITICAL = enum.auto()
     WARNING = enum.auto()

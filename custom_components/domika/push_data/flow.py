@@ -81,7 +81,7 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     # Calculate the changed attributes by subtracting old_state elements from new_state.
     attributes = set(new_attributes.items()) - set(old_attributes.items())
 
-    LOGGER.debug('>>> Got event for entity: %s, attributes: %s', entity_id, attributes)
+    LOGGER.debug('Got event for entity: %s, attributes: %s', entity_id, attributes)
 
     if not attributes:
         return

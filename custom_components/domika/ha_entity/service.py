@@ -48,7 +48,7 @@ async def get(
         if state:
             flat_state = flatten_json(
                 state.as_compressed_state,
-                exclude={'c', 'lc', 'lu'},
+                exclude={"c", "lc", "lu"},
             )
             filtered_dict = {k: v for (k, v) in flat_state.items() if k in attributes}
             result.append(
@@ -58,34 +58,7 @@ async def get(
                     attribute=filtered_dict,
                 ),
             )
-
-            # dict_attributes = {}
-            # state_bytes = orjson.dumps(
-            #     state.as_compressed_state,
-            #     default=json_encoder_domika,
-            #     option=orjson.OPT_NON_STR_KEYS,
-            # )
-            # compressed_state = orjson.loads(state_bytes)
-            # make_dictionary(compressed_state, '', dict_attributes)
-            # filtered_dict = {k: v for (k, v) in dict_attributes.items() if k in attributes_list}
-            # time_updated = max(state.last_changed, state.last_updated).timestamp()
-            # res_list.append(
-            #     {'entity_id': entity_id, 'time_updated': time_updated, 'attributes': filtered_dict}
-            # )
         else:
             LOGGER.error('ha_entity.get is requesting state of unknown entity: "%s"', entity)
-
-    # entity_attributes: dict | None = None
-    # current_entity: str | None = None
-    # for subscription in subscriptions:
-    #     if current_entity != subscription.entity_id:
-    #         entity_attributes = {
-    #             'entity_id': subscription.entity_id,
-    #             'attributes': [subscription.attribute],
-    #         }
-    #         result.append(entity_attributes)
-    #     else:
-    #         # entity_attributes always exists in sthis case.
-    #         entity_attributes['attributes'].append(subscription.attribute)  # type: ignore
 
     return result

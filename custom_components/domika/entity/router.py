@@ -17,7 +17,7 @@ from homeassistant.components.websocket_api.decorators import websocket_command
 from homeassistant.core import HomeAssistant, callback
 
 from ..const import MAIN_LOGGER_NAME
-from .service import get
+from .service import get, get_single
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -48,3 +48,31 @@ def websocket_domika_entity_list(
 
     connection.send_result(msg_id, result)
     LOGGER.debug("entity_list msg_id=%s data=%s", msg_id, result)
+
+
+@websocket_command(
+    {
+        vol.Required("type"): "domika/entity_info",
+        vol.Required("entity_id"): str,
+    },
+)
+@callback
+def websocket_domika_entity_info(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Handle domika entity_info request."""
+    msg_id = msg.get("id")
+    if not msg_id:
+        LOGGER.error('Got websocket message "entity_info", msg_id is missing.')
+        return
+
+    LOGGER.debug('Got websocket message "entity_info", data: %s', msg)
+
+    entity_id = cast(str, msg.get("entity_id"))
+    entity = get_single(hass, entity_id)
+    result = entity.to_dict()
+
+    connection.send_result(msg_id, result)
+    LOGGER.debug("entity_info msg_id=%s data=%s", msg_id, result)

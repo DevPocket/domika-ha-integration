@@ -70,6 +70,8 @@ def _capabilities_climate(hass: HomeAssistant, entity_id: str) -> set[str]:
         capabilities.add("temperatureRange")
     if supported_features & ClimateEntityFeature.TARGET_HUMIDITY:
         capabilities.add("humidity")
+    if supported_features & ClimateEntityFeature.FAN_MODE:
+        capabilities.add("fan")
     return capabilities
 
 

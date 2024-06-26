@@ -13,6 +13,7 @@ from collections.abc import Sequence
 
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
+from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..device.models import Device
@@ -159,14 +160,15 @@ async def update(
 async def delete(
     db_session: AsyncSession,
     event_id: uuid.UUID | list[uuid.UUID],
+    app_session_id: uuid.UUID,
     *,
     commit: bool = True,
 ):
     """Delete push data by event id, or list of event id's."""
     if isinstance(event_id, list):
-        stmt = sqlalchemy.delete(PushData).where(PushData.event_id.in_(event_id))
+        stmt = sqlalchemy.delete(PushData).where(and_(PushData.event_id.in_(event_id), PushData.app_session_id == app_session_id))
     else:
-        stmt = sqlalchemy.delete(PushData).where(PushData.event_id == event_id)
+        stmt = sqlalchemy.delete(PushData).where(and_(PushData.event_id == event_id, PushData.app_session_id == app_session_id))
     await db_session.execute(stmt)
 
     if commit:

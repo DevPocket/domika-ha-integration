@@ -56,7 +56,7 @@ async def websocket_domika_confirm_events(
     if event_ids and app_session_id:
         try:
             async with AsyncSessionFactory() as session:
-                await delete(session, event_ids)
+                await delete(session, event_ids, app_session_id)
         except sqlalchemy.exc.SQLAlchemyError as e:
             LOGGER.error('Can\'t confirm events "%s". Database error. %s', event_ids, e)
         except Exception as e:

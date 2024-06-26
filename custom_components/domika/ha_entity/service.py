@@ -35,7 +35,7 @@ async def get(
 
     subscriptions = await subscription_service.get(db_session, app_session_id, need_push=need_push)
 
-    # Convolute entities attribute in for of dict:
+    # Convolve entities attribute in for of dict:
     # { noqa: ERA001
     #   "entity_id": ["attr1", "attr2"]
     # } noqa: ERA001

@@ -130,6 +130,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     )
     websocket_api.async_register_command(hass, dashboard_router.websocket_domika_update_dashboards)
     websocket_api.async_register_command(hass, dashboard_router.websocket_domika_get_dashboards)
+    websocket_api.async_register_command(hass, dashboard_router.websocket_domika_get_dashboards_hash)
     websocket_api.async_register_command(hass, entity_router.websocket_domika_entity_list)
     websocket_api.async_register_command(hass, entity_router.websocket_domika_entity_info)
 

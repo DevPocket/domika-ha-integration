@@ -157,3 +157,49 @@ async def websocket_domika_get_dashboards(
 
     connection.send_result(msg_id, result)
     LOGGER.debug('update_dashboards msg_id=%s data=%s', msg_id, result)
+
+
+@websocket_command(
+    {
+        vol.Required('type'): 'domika/get_dashboards_hash',
+    },
+)
+@async_response
+async def websocket_domika_get_dashboards_hash(
+        _hass: HomeAssistant,
+        connection: ActiveConnection,
+        msg: dict[str, Any],
+) -> None:
+    """Handle domika get dashboards hash update request."""
+    msg_id = cast(int, msg.get('id'))
+    if not msg_id:
+        LOGGER.error('Got websocket message "get_dashboards_hash", msg_id is missing.')
+        return
+
+    LOGGER.debug(
+        'Got websocket message "get_dashboards_hash", data: %s, user_id: %s',
+        msg,
+        connection.user.id,
+    )
+
+    try:
+        async with AsyncSessionFactory() as session:
+            dashboards = await get(session, connection.user.id)
+    except sqlalchemy.exc.SQLAlchemyError as e:
+        LOGGER.error(
+            'Can\'t get dashboards hash for user "%s". Database error. %s',
+            connection.user.id,
+            e,
+        )
+    except Exception as e:
+        LOGGER.exception(
+            'Can\'t get dashboards hash for user "%s". Unhandled error. %s',
+            connection.user.id,
+            e,
+        )
+
+    result = {"Hash", dashboards.hash}
+
+    connection.send_result(msg_id, result)
+    LOGGER.debug('get_dashboards_hash msg_id=%s data=%s', msg_id, result)
+

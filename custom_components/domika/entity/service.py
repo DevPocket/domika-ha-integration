@@ -16,6 +16,8 @@ from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_FRIENDLY_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     entity as hass_entity,
+    entity_registry,
+    device_registry,
 )
 
 from .models import DomikaEntitiesList, DomikaEntityInfo
@@ -108,6 +110,19 @@ def _related_lock(hass: HomeAssistant, entity_id: str) -> dict:
             related_ids[state.attributes[ATTR_DEVICE_CLASS]] = related_id
     return related_ids
 
+def _related_area(hass: HomeAssistant, entity_id: str) -> str:
+    if entity_entry := entity_registry.async_get(hass).async_get(entity_id):
+        if entity_entry.area_id:
+            return entity_entry.area_id
+        else:
+            searcher = Searcher(hass, hass_entity.entity_sources(hass))
+            related_devices = searcher.async_search(ItemType.ENTITY, entity_id)
+            if related_devices and "device" in related_devices:
+                related_device_id = related_devices["device"].pop()
+                if device_entry := device_registry.async_get(hass).async_get(related_device_id):
+                    return device_entry.area_id
+    return ""
+
 
 def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo:
     result = DomikaEntityInfo({})
@@ -116,6 +131,9 @@ def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo:
         return result
 
     result.info["name"] = state.attributes.get(ATTR_FRIENDLY_NAME) or state.name
+    area = _related_area(hass, entity_id)
+    if area:
+        result.info["area"] = _related_area(hass, entity_id)
 
     # Find out the capabilities of the entity, to be able to select widget size appropriately
     capabilities = set()

@@ -13,7 +13,7 @@ from homeassistant.components.light import ColorMode, get_supported_color_modes,
 from homeassistant.components.search import ItemType, Searcher
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_FRIENDLY_NAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import (
     entity as hass_entity,
     entity_registry,
@@ -74,6 +74,18 @@ def _capabilities_climate(hass: HomeAssistant, entity_id: str) -> set[str]:
         capabilities.add("humidity")
     if supported_features & ClimateEntityFeature.FAN_MODE:
         capabilities.add("fan")
+    return capabilities
+
+
+def _capabilities_sensor(hass: HomeAssistant, state: State) -> set[str]:
+    capabilities = set()
+    capabilities.add(state.attributes.get(ATTR_DEVICE_CLASS))
+    return capabilities
+
+
+def _capabilities_binary_sensor(hass: HomeAssistant, state: State) -> set[str]:
+    capabilities = set()
+    capabilities.add(state.attributes.get(ATTR_DEVICE_CLASS))
     return capabilities
 
 
@@ -141,6 +153,10 @@ def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo:
         capabilities = _capabilities_light(hass, entity_id)
     elif state.domain == "climate":
         capabilities = _capabilities_climate(hass, entity_id)
+    elif state.domain == "sensor":
+        capabilities = _capabilities_sensor(hass, state)
+    elif state.domain == "binary_sensor":
+        capabilities = _capabilities_binary_sensor(hass, state)
     if capabilities:
         result.info["capabilities"] = capabilities
 

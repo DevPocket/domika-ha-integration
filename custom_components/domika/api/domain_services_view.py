@@ -9,7 +9,6 @@ Author(s): Artem Bezborodko
 """
 
 import asyncio
-import json
 import logging
 import uuid
 from http import HTTPStatus
@@ -17,6 +16,7 @@ from http import HTTPStatus
 import sqlalchemy.exc
 from aiohttp import web
 from homeassistant.components.api import APIDomainServicesView
+from homeassistant.helpers.json import json_bytes
 
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
@@ -59,7 +59,7 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
             LOGGER.exception('DomikaAPIDomainServicesView post. Unhandled error. %s', e)
             return self.json_message('Internal error.', HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        data = json.dumps({'entities': result})
         LOGGER.debug('DomikaAPIDomainServicesView data: %s', {'entities': result})
-        response.body = data.encode()
+        data = json_bytes({'entities': result})
+        response.body = data
         return response

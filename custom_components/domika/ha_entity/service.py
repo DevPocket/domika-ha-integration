@@ -51,13 +51,12 @@ async def get(
                 exclude={"c", "lc", "lu"},
             )
             filtered_dict = {k: v for (k, v) in flat_state.items() if k in attributes}
-            result.append(
-                DomikaHaEntity(
-                    entity_id=entity,
-                    time_updated=max(state.last_changed, state.last_updated).timestamp(),
-                    attribute=filtered_dict,
-                ),
+            domikaEntity = DomikaHaEntity(
+                entity_id=entity,
+                time_updated=max(state.last_changed, state.last_updated).timestamp(),
+                attributes=filtered_dict,
             )
+            result.append(domikaEntity,)
         else:
             LOGGER.error('ha_entity.get is requesting state of unknown entity: "%s"', entity)
 

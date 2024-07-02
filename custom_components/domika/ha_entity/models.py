@@ -19,4 +19,4 @@ class DomikaHaEntity(DataClassJSONMixin):
 
     entity_id: str
     time_updated: float
-    attribute: dict[str, str]
+    attributes: dict[str, str]

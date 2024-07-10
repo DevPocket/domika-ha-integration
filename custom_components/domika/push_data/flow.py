@@ -197,6 +197,7 @@ async def _send_push_data(
                 headers={
                     # TODO: rename to x-push-session-id
                     'x-session-id': str(push_session_id),
+                    'app-session-id': str(app_session_id),
                 },
                 json={'data': json.dumps(events_dict)},
                 timeout=PUSH_SERVER_TIMEOUT,

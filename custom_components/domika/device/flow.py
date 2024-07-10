@@ -33,7 +33,7 @@ async def update_app_session_id(
     """
     Update or create app session id.
 
-    If the session exists - updates its last_update and returns its id. Otherwise it creates a new
+    If the session exists - updates its last_update and returns its id. Otherwise, it creates a new
     session and returns its id.
 
     Args:

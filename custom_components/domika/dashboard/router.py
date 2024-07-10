@@ -198,7 +198,7 @@ async def websocket_domika_get_dashboards_hash(
             e,
         )
 
-    result = {"Hash", dashboards.hash}
+    result = {"hash", dashboards.hash}
 
     connection.send_result(msg_id, result)
     LOGGER.debug('get_dashboards_hash msg_id=%s data=%s', msg_id, result)

@@ -227,6 +227,7 @@ async def create_push_session(
     platform: str,
     environment: str,
     push_token: str,
+    app_session_id: str,
 ):
     """
     Initialize push session creation flow on the push server.
@@ -236,6 +237,7 @@ async def create_push_session(
         platform: application platform.
         environment: application environment.
         push_token: application push token.
+        app_session_id: application push session id.
 
     Raises:
         ValueError: if original_transaction_id, push_token, platform or environment is empty.
@@ -243,7 +245,7 @@ async def create_push_session(
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
     """
-    if not (original_transaction_id and push_token and platform and environment):
+    if not (original_transaction_id and push_token and platform and environment and app_session_id):
         msg = 'One of the parameters is missing'
         raise ValueError(msg)
 
@@ -257,6 +259,7 @@ async def create_push_session(
                     'platform': platform,
                     'environment': environment,
                     'push_token': push_token,
+                    'app_session_id': app_session_id,
                 },
                 timeout=PUSH_SERVER_TIMEOUT,
             ) as resp,

@@ -237,42 +237,46 @@ async def _create_push_session(
     platform: str,
     environment: str,
     push_token: str,
+    app_session_id: str,
 ):
     try:
-        await create_push_session(original_transaction_id, platform, environment, push_token)
+        await create_push_session(original_transaction_id, platform, environment, push_token, app_session_id)
         LOGGER.info(
             'Push session creation process successfully initialized. '
-            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s"',
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s", app_session_id="%s" ',
             original_transaction_id,
             platform,
             environment,
             push_token,
+            app_session_id,
         )
     except ValueError as e:
         LOGGER.error(
             "Can't initialize push session creation. "
-            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" %s',
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s", app_session_id="%s" %s',
             original_transaction_id,
             platform,
             environment,
             push_token,
+            app_session_id,
             e,
         )
     except push_server_errors.PushServerError as e:
         LOGGER.error(
             "Can't initialize push session creation. "
-            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" '
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s", app_session_id="%s" '
             'Push server error. %s',
             original_transaction_id,
             platform,
             environment,
             push_token,
+            app_session_id,
             e,
         )
     except Exception as e:
         LOGGER.exception(
             "Can't initialize push session creation. "
-            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s" '
+            'original_transaction_id="%s", platform="%s", environment="%s", push_token="%s", app_session_id="%s" '
             'Unhandled error. %s',
             original_transaction_id,
             platform,
@@ -289,6 +293,7 @@ async def _create_push_session(
         vol.Required('push_token_hex'): str,
         vol.Required('platform'): vol.Any('ios', 'android', 'huawei'),
         vol.Required('environment'): vol.Any('sandbox', 'production'),
+        vol.Required('app_session_id'): str,
     },
 )
 @async_response
@@ -315,6 +320,7 @@ async def websocket_domika_update_push_session(
             cast(str, msg.get('platform')),
             cast(str, msg.get('environment')),
             cast(str, msg.get('push_token_hex')),
+            cast(str, msg.get('app_session_id')),
         ),
         'create_push_session',
     )

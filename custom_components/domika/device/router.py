@@ -45,7 +45,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 )
 @async_response
 async def websocket_domika_update_app_session(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
@@ -63,11 +63,17 @@ async def websocket_domika_update_app_session(
         app_session_id = uuid.UUID(msg.get('app_session_id'))
 
     async with AsyncSessionFactory() as session:
-        app_session_id = await update_app_session_id(session, app_session_id, connection.user.id)
-        LOGGER.info('Successfully updated app session id "%s".', app_session_id)
+        new_app_session_id = await update_app_session_id(session, app_session_id, connection.user.id)
+        LOGGER.info('Successfully updated app session id "%s".', new_app_session_id)
 
-    connection.send_result(msg_id, {'app_session_id': app_session_id})
-    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': app_session_id})
+        # If app_session was re-created — remove the old one.
+        if app_session_id and app_session_id != new_app_session_id:
+            hass.async_create_task(
+                _remove_app_session(app_session_id),
+                'remove_app_session',
+            )
+    connection.send_result(msg_id, {'app_session_id': new_app_session_id})
+    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': new_app_session_id})
 
 
 async def _check_push_token(

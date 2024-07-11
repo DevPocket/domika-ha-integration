@@ -42,13 +42,13 @@ async def update_app_session_id(
         user_id: homeassistant user id.
 
     Returns:
-        If the session exists - returns app_session_id. Otherwise returns newly created session id.
+        If the session exists - returns app_session_id. Otherwise, returns newly created session id.
     """
     result: uuid.UUID | None = None
 
     if app_session_id:
         # Try to find the proper record.
-        device = await get(db_session, app_session_id=app_session_id)
+        device = await get(db_session, app_session_id=app_session_id, user_id=user_id)
 
         if device:
             # If found - update last_update.

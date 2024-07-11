@@ -18,9 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 
 
-async def get(db_session: AsyncSession, app_session_id: uuid.UUID, user_id: str) -> Device | None:
+async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | None:
     """Get device by application sesison id."""
-    stmt = select(Device).where(Device.app_session_id == app_session_id).where(Device.user_id == user_id)
+    stmt = select(Device).where(Device.app_session_id == app_session_id)
     return await db_session.scalar(stmt)
 
 

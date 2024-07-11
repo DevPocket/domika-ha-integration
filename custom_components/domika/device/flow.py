@@ -48,10 +48,10 @@ async def update_app_session_id(
 
     if app_session_id:
         # Try to find the proper record.
-        device = await get(db_session, app_session_id=app_session_id, user_id=user_id)
+        device = await get(db_session, app_session_id=app_session_id)
 
-        if device:
-            # If found - update last_update.
+        if device and device.user_id == user_id:
+            # If found and user_id matches - update last_update.
             result = device.app_session_id
             stmt = sqlalchemy.update(Device)
             stmt = stmt.where(Device.app_session_id == result)

@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import errors, push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
-from .service import create, get, update
+from .service import create, get, update, delete
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -50,14 +50,19 @@ async def update_app_session_id(
         # Try to find the proper record.
         device = await get(db_session, app_session_id=app_session_id)
 
-        if device and device.user_id == user_id:
-            # If found and user_id matches - update last_update.
-            result = device.app_session_id
-            stmt = sqlalchemy.update(Device)
-            stmt = stmt.where(Device.app_session_id == result)
-            stmt = stmt.values(last_update=func.datetime('now'))
-            await db_session.execute(stmt)
-            await db_session.commit()
+        if device:
+            if device.user_id == user_id:
+                # If found and user_id matches - update last_update.
+                result = device.app_session_id
+                stmt = sqlalchemy.update(Device)
+                stmt = stmt.where(Device.app_session_id == result)
+                stmt = stmt.values(last_update=func.datetime('now'))
+                await db_session.execute(stmt)
+                await db_session.commit()
+            else:
+                # If found but user_id mismatch - remove app_session.
+                await delete(db_session, app_session_id)
+
 
     if not result:
         # If not found - create new one.

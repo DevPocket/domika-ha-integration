@@ -90,7 +90,7 @@ async def check_push_token(
     push_token: str,
 ) -> bool:
     """
-    Check that push session is exists, and associated push token does not changed.
+    Check that push session exists, and associated push token is not changed.
 
     If push session id is not found on push server - it will be implicitly deleted for device with
     given app_session_id.
@@ -288,7 +288,7 @@ async def verify_push_session(
     """
     Finishes push session generation.
 
-    After successfull generation store new push session id for device with given app_session_id.
+    After successful generation store new push session id for device with given app_session_id.
 
     Args:
         db_session: sqlalchemy session.

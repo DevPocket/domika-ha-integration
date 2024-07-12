@@ -111,8 +111,9 @@ async def get_push_attributes(db_session: AsyncSession, app_session_id: uuid.UUI
                 'attributes': [subscription.attribute],
             }
             result.append(entity_attributes)
+            current_entity = subscription.entity_id
         else:
-            # entity_attributes always exists in sthis case.
+            # entity_attributes always exists in this case.
             entity_attributes['attributes'].append(subscription.attribute)  # type: ignore
 
     return result

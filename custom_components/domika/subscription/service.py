@@ -33,7 +33,7 @@ async def get(
         Subscription.app_session_id == app_session_id,
         Subscription.need_push == need_push,
     )
-    stmt = stmt.order_by(Subscription.entity_id)
+    stmt = stmt.order_by(Subscription.entity_id).order_by(Subscription.attribute)
     return (await db_session.scalars(stmt)).all()
 
 

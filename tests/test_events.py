@@ -6,38 +6,33 @@ tests.
 
 Author(s): Michael Bogorad
 """
-from __future__ import annotations
-import os
-import uuid
 
-os.environ['DOMIKA_DEBUG'] = "1"
-os.environ[
-    'DOMIKA_DATABASE_URL'] = "sqlite+aiosqlite:///Domika.db"
-os.environ['DOMIKA_PUSH_SERVER_URL'] = "http://159.203.109.27:8000/api/v1"
-os.environ['DOMIKA_PUSH_INTERVAL'] = "60"  # sec
-os.environ['DOMIKA_ALEMBIC_INI_PATH'] = "./alembic.ini"
-
-import asyncio
-from custom_components.domika.database.manage import migrate
-from custom_components.domika.database.core import AsyncSessionFactory
+from tests_init import *
+from custom_components.domika.device.flow import update_app_session_id
 from custom_components.domika.push_data.models import DomikaPushDataCreate
+from custom_components.domika.push_data.flow import register_event
 from custom_components.domika.push_data.service import create
 
-def test_ha_event_fired():
+
+async def test_events():
+    # Create some app_sessions
+    app_session_id1 = await update_app_session_id(db_session, "", USER_ID1)
+    app_session_id2 = await update_app_session_id(db_session, "", USER_ID2)
+
+    # Create events
     push_data = [
         DomikaPushDataCreate(
             uuid.uuid4(),
-            "test_entity_id",
-            "state",
+            "entity_1",
+            "attr1_1",
             "on",
             "event_context_id",
             123123,
         )
     ]
-
-    asyncio.run(migrate())
-    session = AsyncSessionFactory()
-    asyncio.run(create(session, push_data))
+    res = await create(db_session, push_data, returning=True)
+    print(res)
 
 
-test_ha_event_fired()
+asyncio.run(test_events())
+asyncio.run(close_db())

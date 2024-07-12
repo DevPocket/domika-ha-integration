@@ -16,3 +16,4 @@
 # File-based project format
 *.iws
 .idea/**
+/tests/Domika.db

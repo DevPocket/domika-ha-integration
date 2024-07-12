@@ -294,7 +294,7 @@ async def push_registered_events():
                 entity = {}
                 events_dict[event[0].entity_id] = entity
                 current_entity_id = event[0].entity_id
-            entity[event[0].attributes] = {
+            entity[event[0].attribute] = {
                 'v': event[0].value,
                 't': event[0].timestamp,
             }

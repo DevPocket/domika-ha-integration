@@ -101,7 +101,7 @@ async def websocket_domika_entity_state(
 
     entity_id = cast(str, msg.get("entity_id"))
     state = hass.states.get(entity_id)
-    result = None
+    result = {}
     if state:
         time_updated = max(state.last_changed, state.last_updated)
         result = {
@@ -117,6 +117,6 @@ async def websocket_domika_entity_state(
             'entity_state requesting state of unknown entity: %s',
             entity_id,
         )
-    connection.send_result(msg_id, {'entity': result})
+    connection.send_result(msg_id, result)
     LOGGER.debug("entity_state msg_id=%s data=%s", msg_id, result)
 

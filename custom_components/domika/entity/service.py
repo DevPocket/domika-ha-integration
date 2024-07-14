@@ -178,3 +178,4 @@ def get(hass: HomeAssistant, domains: list) -> DomikaEntitiesList:
     for entity_id in entity_ids:
         result.entities[entity_id] = get_single(hass, entity_id).info
     return result
+

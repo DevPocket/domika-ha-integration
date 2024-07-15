@@ -112,7 +112,6 @@ async def create(
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=[
-            PushData.event_id,
             PushData.app_session_id,
             PushData.entity_id,
             PushData.attribute,
@@ -122,6 +121,7 @@ async def create(
             'timestamp': stmt.excluded.timestamp,
         },
     )
+
     if returning:
         stmt = stmt.returning(PushData)
         result = (await db_session.scalars(stmt)).all()

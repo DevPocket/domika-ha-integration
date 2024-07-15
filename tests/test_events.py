@@ -16,8 +16,8 @@ from custom_components.domika.subscription.flow import resubscribe, resubscribe_
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
 
-app_session_id1 = None
-app_session_id2 = None
+app_session_id1: uuid.UUID | None = None
+app_session_id2: uuid.UUID | None = None
 
 
 async def get_push_data_len():

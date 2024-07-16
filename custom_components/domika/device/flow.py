@@ -72,9 +72,7 @@ async def update_app_session_id(
                 app_session_id=uuid.uuid4(),
                 user_id=user_id,
                 push_session_id=None,
-                push_token='',
-                platform='',
-                environment='',
+                push_token_hash='',
             ),
         )
         result = device.app_session_id

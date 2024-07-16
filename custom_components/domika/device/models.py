@@ -28,9 +28,7 @@ class Device(AsyncBase):
     app_session_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     user_id: Mapped[str]
     push_session_id: Mapped[uuid.UUID | None] = mapped_column(default=None, nullable=True)
-    push_token: Mapped[str]
-    platform: Mapped[str]
-    environment: Mapped[str]
+    push_token_hash: Mapped[str]
     last_update: Mapped[int] = mapped_column(
         server_default=func.datetime('now'),
         onupdate=func.datetime('now'),
@@ -52,9 +50,7 @@ class DomikaDeviceBase(DataClassJSONMixin):
             'serialization_strategy': pass_through,
         },
     )
-    push_token: str
-    platform: str
-    environment: str
+    push_token_hash: str
 
 
 @dataclass
@@ -79,9 +75,7 @@ class DomikaDeviceUpdate(DataClassJSONMixin):
             'serialization_strategy': pass_through,
         },
     )
-    push_token: str | NOT_SET = 'NOT_SET'
-    platform: str | NOT_SET = 'NOT_SET'
-    environment: str | NOT_SET = 'NOT_SET'
+    push_token_hash: str | NOT_SET = 'NOT_SET'
     last_update: int | NOT_SET = 'NOT_SET'
 
     class Config(BaseConfig):

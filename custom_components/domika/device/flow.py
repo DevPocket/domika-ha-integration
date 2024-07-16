@@ -46,21 +46,19 @@ async def update_app_session_id(
     Returns:
         If the session exists - returns app_session_id. Otherwise, returns newly created session id.
     """
-    result: uuid.UUID | None = None
+    new_app_session_id: uuid.UUID | None = None
     result_old_app_sessions: [str] = []
 
     if app_session_id:
         # Try to find the proper record.
         device = await get(db_session, app_session_id=app_session_id)
-        old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
-        result_old_app_sessions = [device.app_session_id for device in old_devices]
 
         if device:
             if device.user_id == user_id:
                 # If found and user_id matches - update last_update.
-                result = device.app_session_id
+                new_app_session_id = device.app_session_id
                 stmt = sqlalchemy.update(Device)
-                stmt = stmt.where(Device.app_session_id == result)
+                stmt = stmt.where(Device.app_session_id == new_app_session_id)
                 stmt = stmt.values(last_update=func.datetime('now'))
                 await db_session.execute(stmt)
                 await db_session.commit()
@@ -69,7 +67,7 @@ async def update_app_session_id(
                 await delete(db_session, app_session_id)
 
 
-    if not result:
+    if not new_app_session_id:
         # If not found - create new one.
         device = await create(
             db_session,
@@ -80,9 +78,15 @@ async def update_app_session_id(
                 push_token_hash='',
             ),
         )
-        result = device.app_session_id
+        new_app_session_id = device.app_session_id
 
-    return result, result_old_app_sessions
+    old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
+    result_old_app_sessions = [
+        device.app_session_id for device in old_devices
+        if device.app_session_id != new_app_session_id
+    ]
+
+    return new_app_session_id, result_old_app_sessions
 
 
 async def check_push_token(

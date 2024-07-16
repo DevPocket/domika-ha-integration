@@ -75,7 +75,7 @@ async def update_app_session_id(
                 app_session_id=uuid.uuid4(),
                 user_id=user_id,
                 push_session_id=None,
-                push_token_hash='',
+                push_token_hash=push_token_hash,
             ),
         )
         new_app_session_id = device.app_session_id
@@ -341,9 +341,9 @@ async def verify_push_session(
                 except ValueError:
                     msg = 'Malformed push_session_id.'
                     raise push_server_errors.ResponseError(msg) from None
-                # If push_token_hash is not empty, remove all Devices with the same push_token_hash
+                # If push_token_hash exists, remove Devices with the same push_token_hash, except current device
                 if push_token_hash:
-                    await remove_all_with_push_token_hash(db_session, push_token_hash)
+                    await remove_all_with_push_token_hash(db_session, push_token_hash, device)
                 await update(
                     db_session,
                     device,

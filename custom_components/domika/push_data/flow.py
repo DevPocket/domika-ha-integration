@@ -249,7 +249,6 @@ async def push_registered_events():
         stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
         stmt = stmt.order_by(
             PushData.app_session_id,
-            Device.push_token,
             PushData.entity_id,
         )
         events = (await session.execute(stmt)).all()

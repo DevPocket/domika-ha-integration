@@ -44,11 +44,12 @@ async def get_all_with_push_token_hash(db_session: AsyncSession, push_token_hash
 async def remove_all_with_push_token_hash(
     db_session: AsyncSession,
     push_token_hash: str,
+    device: Device,
     *,
     commit: bool = True,
 ):
     """Remove all devices with the given push_token_hash."""
-    stmt = sqlalchemy.delete(Device).where(Device.push_token_hash == push_token_hash)
+    stmt = sqlalchemy.delete(Device).where(Device.push_token_hash == push_token_hash).where(Device.app_session_id != device.app_session_id)
     await db_session.execute(stmt)
 
     if commit:

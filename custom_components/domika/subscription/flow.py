@@ -130,7 +130,7 @@ async def get_app_session_id_by_attributes(
     Args:
         db_session: sqlalchemy session.
         entity_id: homeassistant entity id.
-        attributes: entity's atrributes to search.
+        attributes: entity's attributes to search.
 
     Returns:
         app session id's for with given entity_id that contains attribute from attributes

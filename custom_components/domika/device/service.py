@@ -36,6 +36,20 @@ async def get_by_user_id(db_session: AsyncSession, user_id: str) -> Sequence[Dev
     return (await db_session.scalars(stmt)).all()
 
 
+async def remove_all_with_push_token_hash(
+    db_session: AsyncSession,
+    push_token_hash: str,
+    *,
+    commit: bool = True,
+):
+    """Remove all devices with the given push_token_hash."""
+    stmt = sqlalchemy.delete(Device).where(Device.push_token_hash == push_token_hash)
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
 async def create(
     db_session: AsyncSession,
     device_in: DomikaDeviceCreate,

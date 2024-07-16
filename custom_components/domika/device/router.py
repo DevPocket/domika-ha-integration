@@ -399,51 +399,58 @@ async def websocket_domika_remove_app_session(
 async def _verify_push_session(
     app_session_id: uuid.UUID,
     verification_key: str,
+    push_token_hash: str,
 ):
     try:
         async with AsyncSessionFactory() as session:
-            push_session_id = await verify_push_session(session, app_session_id, verification_key)
+            push_session_id = await verify_push_session(session, app_session_id, verification_key, push_token_hash)
         LOGGER.info(
             'Verification key "%s" for application "%s" successfully verified. '
-            'New push session id "%s"',
+            'New push session id "%s". Push token hash "%s"',
             verification_key,
             app_session_id,
             push_session_id,
+            push_token_hash,
         )
     except (ValueError, errors.AppSessionIdNotFoundError) as e:
         LOGGER.error(
-            'Can\'t verify verification key "%s" for application "%s". %s',
+            'Can\'t verify verification key "%s" for application "%s". Push token hash "%s". %s',
             verification_key,
             app_session_id,
+            push_token_hash,
             e,
         )
     except push_server_errors.BadRequestError as e:
         LOGGER.error(
-            'Can\'t verify verification key "%s" for application "%s". Push server error. %s. %s',
+            'Can\'t verify verification key "%s" for application "%s". Push server error. Push token hash "%s". %s. %s',
             verification_key,
             app_session_id,
+            push_token_hash,
             e,
             e.body,
         )
     except push_server_errors.PushServerError as e:
         LOGGER.error(
-            'Can\'t verify verification key "%s" for application "%s". Push server error. %s',
+            'Can\'t verify verification key "%s" for application "%s". Push server error. Push token hash "%s". %s',
             verification_key,
             app_session_id,
+            push_token_hash,
             e,
         )
     except sqlalchemy.exc.SQLAlchemyError as e:
         LOGGER.error(
-            'Can\'t verify verification key "%s" for application "%s". Database error. %s',
+            'Can\'t verify verification key "%s" for application "%s". Database error. Push token hash "%s". %s',
             verification_key,
             app_session_id,
+            push_token_hash,
             e,
         )
     except Exception as e:
         LOGGER.exception(
-            'Can\'t verify verification key "%s" for application "%s". Unhandled error. %s',
+            'Can\'t verify verification key "%s" for application "%s". Push token hash "%s". Unhandled error. %s',
             verification_key,
             app_session_id,
+            push_token_hash,
             e,
         )
 
@@ -453,6 +460,7 @@ async def _verify_push_session(
         vol.Required('type'): 'domika/verify_push_session',
         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('verification_key'): str,
+        vol.Required('push_token_hash'): str,
     },
 )
 @async_response
@@ -477,6 +485,7 @@ async def websocket_domika_verify_push_session(
         _verify_push_session(
             cast(uuid.UUID, msg.get('app_session_id')),
             cast(str, msg.get('verification_key')),
+            cast(str, msg.get('push_token_hash')),
         ),
         'verify_push_session',
     )

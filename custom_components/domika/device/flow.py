@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import errors, push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
-from .service import create, get, update, delete
+from .service import create, get, update, delete, remove_all_with_push_token_hash
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -282,6 +282,8 @@ async def verify_push_session(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     verification_key: str,
+    push_token_hash: str,
+
 ) -> uuid.UUID:
     """
     Finishes push session generation.
@@ -292,6 +294,7 @@ async def verify_push_session(
         db_session: sqlalchemy session.
         app_session_id: application session id.
         verification_key: verification key.
+        push_token_hash: hash of the triplet (push_token, platform, environment)
 
     Raises:
         ValueError: if verification_key is empty.
@@ -329,10 +332,11 @@ async def verify_push_session(
                 except ValueError:
                     msg = 'Malformed push_session_id.'
                     raise push_server_errors.ResponseError(msg) from None
+                await remove_all_with_push_token_hash(db_session, push_token_hash)
                 await update(
                     db_session,
                     device,
-                    DomikaDeviceUpdate(push_session_id=push_session_id),
+                    DomikaDeviceUpdate(push_session_id=push_session_id, push_token_hash=push_token_hash),
                 )
                 return push_session_id
 

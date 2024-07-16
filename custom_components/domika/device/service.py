@@ -36,6 +36,11 @@ async def get_by_user_id(db_session: AsyncSession, user_id: str) -> Sequence[Dev
     return (await db_session.scalars(stmt)).all()
 
 
+async def get_all_with_push_token_hash(db_session: AsyncSession, push_token_hash: str) -> [Device]:
+    stmt = select(Device).where(Device.push_token_hash == push_token_hash)
+    return (await db_session.scalars(stmt)).all()
+
+
 async def remove_all_with_push_token_hash(
     db_session: AsyncSession,
     push_token_hash: str,

@@ -41,6 +41,7 @@ LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
     {
         vol.Required('type'): 'domika/update_app_session',
         vol.Optional('app_session_id'): str,
+        vol.Optional('push_token_hash'): str,
     },
 )
 @async_response
@@ -57,17 +58,18 @@ async def websocket_domika_update_app_session(
 
     LOGGER.debug('Got websocket message "update_app_session", data: %s', msg)
 
+    push_token_hash = cast(str, msg.get('push_token_hash') or "")
     app_session_id: uuid.UUID | None = None
     cm = contextlib.suppress(TypeError)
     with cm:
         app_session_id = uuid.UUID(msg.get('app_session_id'))
 
     async with AsyncSessionFactory() as session:
-        app_session_id = await update_app_session_id(session, app_session_id, connection.user.id)
+        app_session_id, old_app_session_ids = await update_app_session_id(session, app_session_id, connection.user.id, push_token_hash)
         LOGGER.info('Successfully updated app session id "%s".', app_session_id)
 
-    connection.send_result(msg_id, {'app_session_id': app_session_id})
-    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': app_session_id})
+    connection.send_result(msg_id, {'app_session_id': app_session_id, 'old_app_session_ids': old_app_session_ids})
+    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': app_session_id, 'old_app_session_ids': old_app_session_ids})
 
 
 async def _check_push_token(
@@ -460,7 +462,7 @@ async def _verify_push_session(
         vol.Required('type'): 'domika/verify_push_session',
         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('verification_key'): str,
-        vol.Required('push_token_hash'): str,
+        vol.Optional('push_token_hash'): str,
     },
 )
 @async_response
@@ -485,7 +487,7 @@ async def websocket_domika_verify_push_session(
         _verify_push_session(
             cast(uuid.UUID, msg.get('app_session_id')),
             cast(str, msg.get('verification_key')),
-            cast(str, msg.get('push_token_hash')),
+            cast(str, msg.get('push_token_hash') or ""),
         ),
         'verify_push_session',
     )

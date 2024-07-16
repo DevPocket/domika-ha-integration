@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import errors, push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
-from .service import create, get, update, delete, remove_all_with_push_token_hash
+from .service import create, get, update, delete, remove_all_with_push_token_hash, get_all_with_push_token_hash
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -29,7 +29,8 @@ async def update_app_session_id(
     db_session: AsyncSession,
     app_session_id: uuid.UUID | None,
     user_id: str,
-) -> uuid.UUID:
+    push_token_hash: str,
+) -> (uuid.UUID, [str]):
     """
     Update or create app session id.
 
@@ -40,15 +41,19 @@ async def update_app_session_id(
         db_session: sqlalchemy session.
         app_session_id: Application session id.
         user_id: homeassistant user id.
+        push_token_hash: hash of push_token+platform+environment.
 
     Returns:
         If the session exists - returns app_session_id. Otherwise, returns newly created session id.
     """
     result: uuid.UUID | None = None
+    result_old_app_sessions: [str] = []
 
     if app_session_id:
         # Try to find the proper record.
         device = await get(db_session, app_session_id=app_session_id)
+        old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
+        result_old_app_sessions = [device.app_session_id for device in old_devices]
 
         if device:
             if device.user_id == user_id:
@@ -77,7 +82,7 @@ async def update_app_session_id(
         )
         result = device.app_session_id
 
-    return result
+    return result, result_old_app_sessions
 
 
 async def check_push_token(
@@ -332,7 +337,9 @@ async def verify_push_session(
                 except ValueError:
                     msg = 'Malformed push_session_id.'
                     raise push_server_errors.ResponseError(msg) from None
-                await remove_all_with_push_token_hash(db_session, push_token_hash)
+                # If push_token_hash is not empty, remove all Devices with the same push_token_hash
+                if push_token_hash:
+                    await remove_all_with_push_token_hash(db_session, push_token_hash)
                 await update(
                     db_session,
                     device,

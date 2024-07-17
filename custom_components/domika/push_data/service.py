@@ -188,19 +188,14 @@ async def delete_all(
         await db_session.commit()
 
 
-async def delete_for_platform(
+async def delete_for_app_session(
     db_session: AsyncSession,
-    platform: str,
+    app_session_id: uuid.UUID,
     *,
     commit: bool = True,
 ):
-    """Delete push data by platform name."""
-    sq = sqlalchemy.select(PushData.event_id)
-    sq = sq.join(Device, PushData.app_session_id == Device.app_session_id)
-    sq = sq.where(Device.platform == platform)
-    sq = sq.scalar_subquery()
-
-    stmt = sqlalchemy.delete(PushData).where(PushData.event_id.in_(sq))
+    """Delete push data records for a certain app_session_id."""
+    stmt = sqlalchemy.delete(PushData).where(PushData.app_session_id == app_session_id)
     await db_session.execute(stmt)
 
     if commit:

@@ -21,6 +21,7 @@ from homeassistant.helpers.json import json_bytes
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..ha_entity import service as ha_entity_service
+from ..push_data import service as push_data_service
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -52,6 +53,8 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         try:
             async with AsyncSessionFactory() as session:
                 result = await ha_entity_service.get(session, app_session_id)
+            await push_data_service.delete_for_app_session(session, app_session_id=app_session_id)
+
         except sqlalchemy.exc.SQLAlchemyError as e:
             LOGGER.error('DomikaAPIDomainServicesView post. Database error. %s', e)
             return self.json_message('Database error.', HTTPStatus.INTERNAL_SERVER_ERROR)

@@ -13,12 +13,14 @@ import logging
 import uuid
 from http import HTTPStatus
 
+import sqlalchemy
 from aiohttp import web
 from homeassistant.helpers.http import HomeAssistantView
 
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..ha_entity import service as ha_entity_service
+from ..push_data import service as push_data_service
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -53,8 +55,17 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
 
         await asyncio.sleep(delay)
 
-        async with AsyncSessionFactory() as session:
-            result = await ha_entity_service.get(session, app_session_id)
+        try:
+            async with AsyncSessionFactory() as session:
+                result = await ha_entity_service.get(session, app_session_id)
+            await push_data_service.delete_for_app_session(session, app_session_id=app_session_id)
+
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            LOGGER.error('DomikaAPIPushStatesWithDelay. Database error. %s', e)
+            return self.json_message('Database error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            LOGGER.exception('DomikaAPIPushStatesWithDelay. Unhandled error. %s', e)
+            return self.json_message('Internal error.', HTTPStatus.INTERNAL_SERVER_ERROR)
 
         data = {'entities': result}
         LOGGER.debug('DomikaAPIPushStatesWithDelay data: %s', data)

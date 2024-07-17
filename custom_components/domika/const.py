@@ -13,10 +13,10 @@ MAIN_LOGGER_NAME = DOMAIN
 
 
 if os.getenv("DOMIKA_DEBUG") == "1":
-    ALEMBIC_INI_PATH = os.getenv("DOMIKA_ALEMBIC_INI_PATH")
     DATABASE_URL = os.getenv("DOMIKA_DATABASE_URL")
     PUSH_SERVER_URL = os.getenv("DOMIKA_PUSH_SERVER_URL")
     PUSH_INTERVAL = timedelta(seconds=int(os.getenv("DOMIKA_PUSH_INTERVAL") or 30))
+    ALEMBIC_INI_PATH = os.getenv("DOMIKA_ALEMBIC_INI_PATH")
 else:
     DATABASE_URL = "sqlite+aiosqlite:///Domika.db"
     PUSH_SERVER_URL = "http://159.203.109.27:8000/api/v1"

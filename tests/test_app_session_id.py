@@ -15,14 +15,14 @@ from custom_components.domika.device.models import Device
 
 async def test_app_session_id_create_update_delete():
     # Create a new app_session
-    app_session_id1 = await update_app_session_id(db_session, "", USER_ID1)
+    app_session_id1, _ = await update_app_session_id(db_session, "", USER_ID1, "")
     # Check that we have just one record
     stmt = select(Device).where(Device.app_session_id == app_session_id1)
     res = (await db_session.scalars(stmt)).all()
     assert len(res) == 1
 
     # Try to create it again
-    app_session_id2 = await update_app_session_id(db_session, app_session_id1, USER_ID1)
+    app_session_id2, _ = await update_app_session_id(db_session, app_session_id1, USER_ID1, "")
     # Check that app_session_id didn't change
     assert app_session_id1 == app_session_id2
     # Check that we still have just one record
@@ -31,7 +31,7 @@ async def test_app_session_id_create_update_delete():
     assert len(res) == 1
 
     # Create the same one with a different user_id
-    app_session_id3 = await update_app_session_id(db_session, app_session_id2, USER_ID2)
+    app_session_id3, _ = await update_app_session_id(db_session, app_session_id2, USER_ID2, "")
 
     # Check that app_session_id was recreated
     assert app_session_id2 != app_session_id3
@@ -45,9 +45,9 @@ async def test_app_session_id_create_update_delete():
     assert device.user_id == USER_ID2
 
     # Create another 3 app_sessions
-    app_session_id1 = await update_app_session_id(db_session, "", USER_ID1)
-    app_session_id2 = await update_app_session_id(db_session, "", USER_ID2)
-    app_session_id4 = await update_app_session_id(db_session, "", USER_ID3)
+    app_session_id1, _ = await update_app_session_id(db_session, "", USER_ID1, "")
+    app_session_id2, _ = await update_app_session_id(db_session, "", USER_ID2, "")
+    app_session_id4, _ = await update_app_session_id(db_session, "", USER_ID3, "")
 
     # Check that we have 4 records
     stmt = select(Device)

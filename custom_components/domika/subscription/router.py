@@ -21,7 +21,7 @@ from homeassistant.core import HomeAssistant
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..utils import flatten_json
-from .flow import resubscribe, resubscribe_push
+from .flow import resubscribe
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -49,7 +49,7 @@ async def websocket_domika_resubscribe(
     app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
 
     res_list = []
-    subscriptions = cast(dict[str, set], msg.get('subscriptions'))
+    subscriptions = cast(dict[str, dict[str, int]], msg.get('subscriptions'))
     for entity_id in subscriptions:
         state = hass.states.get(entity_id)
         if state:
@@ -80,37 +80,37 @@ async def websocket_domika_resubscribe(
         LOGGER.exception('Can\'t resubscribe "%s". Unhandled error. %s', subscriptions, e)
 
 
-@websocket_command(
-    {
-        vol.Required('type'): 'domika/resubscribe_push',
-        vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
-        vol.Required('subscriptions'): dict[str, set],
-    },
-)
-@async_response
-async def websocket_domika_resubscribe_push(
-    _hass: HomeAssistant,
-    connection: ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle domika resubscribe push request."""
-    msg_id = cast(int, msg.get('id'))
-    if not msg_id:
-        LOGGER.error('Got websocket message "resubscribe_push", msg_id is missing.')
-        return
-
-    LOGGER.debug('Got websocket message "resubscribe_push", data: %s', msg)
-
-    # Fast send reply.
-    connection.send_result(msg_id, {'result': 'accepted'})
-    LOGGER.debug('resubscribe_push msg_id=%s data=%s', msg_id, {'result': 'accepted'})
-
-    app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
-    subscriptions = cast(dict[str, set], msg.get('subscriptions'))
-    try:
-        async with AsyncSessionFactory() as session:
-            await resubscribe_push(session, app_session_id, subscriptions)
-    except sqlalchemy.exc.SQLAlchemyError as e:
-        LOGGER.error('Can\'t resubscribe push "%s". Database error. %s', subscriptions, e)
-    except Exception as e:
-        LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)
+# @websocket_command(
+#     {
+#         vol.Required('type'): 'domika/resubscribe_push',
+#         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
+#         vol.Required('subscriptions'): dict[str, set],
+#     },
+# )
+# @async_response
+# async def websocket_domika_resubscribe_push(
+#     _hass: HomeAssistant,
+#     connection: ActiveConnection,
+#     msg: dict[str, Any],
+# ) -> None:
+#     """Handle domika resubscribe push request."""
+#     msg_id = cast(int, msg.get('id'))
+#     if not msg_id:
+#         LOGGER.error('Got websocket message "resubscribe_push", msg_id is missing.')
+#         return
+#
+#     LOGGER.debug('Got websocket message "resubscribe_push", data: %s', msg)
+#
+#     # Fast send reply.
+#     connection.send_result(msg_id, {'result': 'accepted'})
+#     LOGGER.debug('resubscribe_push msg_id=%s data=%s', msg_id, {'result': 'accepted'})
+#
+#     app_session_id = cast(uuid.UUID, msg.get('app_session_id'))
+#     subscriptions = cast(dict[str, set], msg.get('subscriptions'))
+#     try:
+#         async with AsyncSessionFactory() as session:
+#             await resubscribe_push(session, app_session_id, subscriptions)
+#     except sqlalchemy.exc.SQLAlchemyError as e:
+#         LOGGER.error('Can\'t resubscribe push "%s". Database error. %s', subscriptions, e)
+#     except Exception as e:
+#         LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)

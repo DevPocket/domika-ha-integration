@@ -29,7 +29,7 @@ async def test_push_session_create_update_delete():
         assert isinstance(e, errors.AppSessionIdNotFoundError)
 
     # Check that proper exception is raised if no app_session found
-    app_session_id1 = await update_app_session_id(db_session, "", USER_ID1)
+    app_session_id1, _ = await update_app_session_id(db_session, "", USER_ID1)
     try:
         res = await check_push_token(db_session, app_session_id1, "ios", "sandbox", "dummy_push_token")
     except Exception as e:

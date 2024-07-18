@@ -12,7 +12,7 @@ from custom_components.domika.device.flow import update_app_session_id
 from custom_components.domika.push_data.models import DomikaPushDataCreate, PushData
 from custom_components.domika.push_data.flow import register_event
 from custom_components.domika.push_data.service import create, delete
-from custom_components.domika.subscription.flow import resubscribe, resubscribe_push, get_push_attributes, get_app_session_id_by_attributes
+from custom_components.domika.subscription.flow import resubscribe, get_push_attributes, get_app_session_id_by_attributes
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
 
@@ -29,26 +29,17 @@ async def test_events():
     # Create some app_sessions
     global app_session_id1
     global app_session_id2
-    app_session_id1 = await update_app_session_id(db_session, "", USER_ID1)
-    app_session_id2 = await update_app_session_id(db_session, "", USER_ID2)
+    app_session_id1, _ = await update_app_session_id(db_session, "", USER_ID1, "")
+    app_session_id2, _ = await update_app_session_id(db_session, "", USER_ID2, "")
     await resubscribe(db_session, app_session_id1, {
-        "entity1": {"attr1_1", "attr1_2", "attr1_3"},
-        "entity2": {"attr2_1", "attr2_2", "attr2_3"},
+        "entity1": {"attr1_1": 1, "attr1_2": 1, "attr1_3": 0},
+        "entity2": {"attr2_1": 1, "attr2_2": 0, "attr2_3": 0},
     })
     await resubscribe(db_session, app_session_id2, {
-        "entity1": {"attr1_1"},
-        "entity2": {"attr2_1"},
-        "entity3": {"attr3_1", "attr3_2", "attr3_3"},
+        "entity1": {"attr1_1": 0},
+        "entity2": {"attr2_1": 1},
+        "entity3": {"attr3_1": 1, "attr3_2": 1, "attr3_3": 0},
     })
-    await resubscribe_push(db_session, app_session_id1, {
-        "entity1": {"attr1_1", "attr1_2"},
-        "entity2": {"attr2_1"},
-    })
-    await resubscribe_push(db_session, app_session_id2, {
-        "entity2": {"attr2_1"},
-        "entity3": {"attr3_1", "attr3_2"},
-    })
-
 
     # Create 3 similar events
     push_data = [

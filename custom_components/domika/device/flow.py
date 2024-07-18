@@ -83,7 +83,7 @@ async def update_app_session_id(
     old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
     result_old_app_sessions = [
         device.app_session_id for device in old_devices
-        if device.app_session_id != new_app_session_id
+            if device.app_session_id != new_app_session_id
     ]
 
     return new_app_session_id, result_old_app_sessions

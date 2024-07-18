@@ -119,10 +119,6 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, device_router.websocket_domika_verify_push_session)
     websocket_api.async_register_command(hass, device_router.websocket_domika_remove_push_session)
     websocket_api.async_register_command(hass, subscription_router.websocket_domika_resubscribe)
-    websocket_api.async_register_command(
-        hass,
-        subscription_router.websocket_domika_resubscribe_push,
-    )
     websocket_api.async_register_command(hass, push_data_router.websocket_domika_confirm_events)
     websocket_api.async_register_command(
         hass,

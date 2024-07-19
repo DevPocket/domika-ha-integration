@@ -102,31 +102,5 @@ async def test_subscriptions():
     assert set(app_session_ids) == {app_session_id2}
 
 
-async def test_new_resubscribe():
-    data = {
-        "light.basement_back_light":
-            {
-                "a.hs_color": 1,
-                "a.effect": 1,
-                "a.brightness": 1,
-                "s": 1,
-                "a.color_temp_kelvin": 1,
-            },
-        "light.basement":
-            {
-                "a.hs_color": 0,
-                "a.effect": 1,
-                "a.brightness": 0,
-                "s": 1,
-                "a.color_temp_kelvin": 0,
-            }
-    }
-    subscriptions = cast(dict[str, dict[str, bool]], data)
-    for entity, attrs in subscriptions.items():
-        for attr_name, need_push in attrs.items():
-            print(attr_name, bool(need_push))
-
-
 asyncio.run(test_subscriptions())
-# asyncio.run(test_new_resubscribe())
 asyncio.run(close_db())

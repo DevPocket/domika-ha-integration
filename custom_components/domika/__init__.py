@@ -16,6 +16,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .api.domain_services_view import DomikaAPIDomainServicesView
 from .api.push_states_with_delay import DomikaAPIPushStatesWithDelay
+from .api.push_resubscribe import DomikaAPIPushResubscribe
 from .const import DOMAIN, MAIN_LOGGER_NAME, PUSH_INTERVAL
 from .critical_sensor import router as critical_sensor_router
 from .dashboard import router as dashboard_router
@@ -110,6 +111,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     # Setup Domika api views.
     hass.http.register_view(DomikaAPIDomainServicesView)
     hass.http.register_view(DomikaAPIPushStatesWithDelay)
+    hass.http.register_view(DomikaAPIPushResubscribe)
 
     # Setup Domika WebSocket commands.
     websocket_api.async_register_command(hass, device_router.websocket_domika_update_app_session)

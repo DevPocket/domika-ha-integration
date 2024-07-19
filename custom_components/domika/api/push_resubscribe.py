@@ -69,9 +69,7 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        app_session_id = request_dict.get('app_session_id', None)
-        subscriptions = cast(dict[str, set], request_dict.get('subscriptions', None))
-
+        subscriptions = cast(dict[str, set[str]], request_dict.get('subscriptions', None))
         if not subscriptions:
             return self.json_message(
                 'Missing or malformed subscriptions.',

@@ -11,7 +11,6 @@ Author(s): Artem Bezborodko
 import uuid
 from collections.abc import Sequence
 from dataclasses import asdict
-
 import sqlalchemy
 from sqlalchemy.ext.asyncio import AsyncSession
 

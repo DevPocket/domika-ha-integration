@@ -14,8 +14,11 @@ import uuid
 
 import aiohttp
 import sqlalchemy
+from homeassistant.core import HomeAssistant
+from homeassistant.components import network
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
+from homeassistant.components.cloud import DOMAIN as CLOUD_DOMAIN
 
 from .. import errors, push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
@@ -24,6 +27,51 @@ from .service import create, get, update, delete, remove_all_with_push_token_has
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
+async def get_hass_network_properties(hass: HomeAssistant) -> dict:
+    instance_name = hass.config.location_name
+    cloud_url: str | None = None
+    certificate_fingerprint: str | None = None
+
+    port = hass.http.server_port
+
+    external_url = hass.config.external_url
+    internal_url = hass.config.internal_url
+
+    local_url: str | None = None
+    from homeassistant.components.hassio import get_host_info, is_hassio
+    if is_hassio(hass) and (host_info := get_host_info(hass)):
+        local_url = f"http://{host_info['hostname']}.local:{port}"
+
+    if "cloud" in hass.config.components:
+        from homeassistant.components.cloud import (CloudNotAvailable, async_remote_ui_url,)
+        try:
+            cloud_url = async_remote_ui_url(hass)
+            if hass.data[CLOUD_DOMAIN]:
+                cloud = hass.data[CLOUD_DOMAIN]
+
+                certificate_fingerprint = cloud.remote.certificate.fingerprint
+        except CloudNotAvailable as err:
+            cloud_url = None
+
+    announce_addresses = await network.async_get_announce_addresses(hass)
+    local_ip_port = f"http://{announce_addresses[0]}:{port}"
+
+    result = dict()
+    if instance_name:
+        result["instance_name"] = instance_name
+    if local_ip_port:
+        result["local_ip_port"] = local_ip_port
+    if local_url:
+        result["local_url"] = local_url
+    if external_url:
+        result["external_url"] = external_url
+    if internal_url:
+        result["internal_url"] = internal_url
+    if cloud_url:
+        result["cloud_url"] = cloud_url
+    if certificate_fingerprint:
+        result["certificate_fingerprint"] = certificate_fingerprint
+    return result
 
 async def update_app_session_id(
     db_session: AsyncSession,

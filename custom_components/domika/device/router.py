@@ -30,7 +30,7 @@ from .flow import (
     create_push_session,
     remove_push_session,
     update_app_session_id,
-    verify_push_session,
+    verify_push_session, get_hass_network_properties,
 )
 from .service import delete
 
@@ -68,8 +68,14 @@ async def websocket_domika_update_app_session(
         app_session_id, old_app_session_ids = await update_app_session_id(session, app_session_id, connection.user.id, push_token_hash)
         LOGGER.info('Successfully updated app session id "%s".', app_session_id)
 
+    result = {
+        'app_session_id': app_session_id,
+        'old_app_session_ids': old_app_session_ids
+    }
+    result.update(await get_hass_network_properties(hass))
+
     connection.send_result(msg_id, {'app_session_id': app_session_id, 'old_app_session_ids': old_app_session_ids})
-    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, {'app_session_id': app_session_id, 'old_app_session_ids': old_app_session_ids})
+    LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, result)
 
 
 async def _check_push_token(

@@ -74,7 +74,7 @@ async def websocket_domika_update_app_session(
     }
     result.update(await get_hass_network_properties(hass))
 
-    connection.send_result(msg_id, {'app_session_id': app_session_id, 'old_app_session_ids': old_app_session_ids})
+    connection.send_result(msg_id, result)
     LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, result)
 
 

@@ -60,7 +60,7 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
         request_dict = await request.json()
         LOGGER.debug('request_dict: %s', request_dict)
 
-        app_session_id = request_dict.get('app_session_id', None)
+        app_session_id = request.headers.get('X-App-Session-Id')
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):

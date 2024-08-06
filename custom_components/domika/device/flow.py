@@ -329,6 +329,8 @@ async def create_push_session(
                 timeout=PUSH_SERVER_TIMEOUT,
             ) as resp,
         ):
+            LOGGER.debug('create_push_session resp.status=%s', resp.status)
+
             if resp.status == statuses.HTTP_202_ACCEPTED:
                 return
 

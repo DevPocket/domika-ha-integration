@@ -31,7 +31,7 @@ from .flow import (
     update_app_session_id,
     verify_push_session, get_hass_network_properties,
 )
-from .service import get, delete, check_push_token_hash
+from .service import get, delete
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 

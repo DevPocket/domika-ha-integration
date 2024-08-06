@@ -389,9 +389,9 @@ async def verify_push_session(
                 except ValueError:
                     msg = 'Malformed push_session_id.'
                     raise push_server_errors.ResponseError(msg) from None
-                # If push_token_hash exists, remove Devices with the same push_token_hash, except current device
-                if push_token_hash:
-                    await remove_all_with_push_token_hash(db_session, push_token_hash, device)
+                # Remove Devices with the same push_token_hash, except current device.
+                await remove_all_with_push_token_hash(db_session, push_token_hash, device)
+                # Update push_session_id and push_token_hash.
                 await update(
                     db_session,
                     device,

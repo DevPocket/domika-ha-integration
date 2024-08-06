@@ -152,6 +152,7 @@ async def _check_push_token(
         vol.Required('push_token_hex'): str,
         vol.Required('platform'): vol.Any('ios', 'android', 'huawei'),
         vol.Required('environment'): vol.Any('sandbox', 'production'),
+        vol.Required('push_token_hash'): str,
     },
 )
 @async_response
@@ -172,6 +173,7 @@ async def websocket_domika_update_push_token(
     connection.send_result(msg_id, {'result': 'accepted'})
     LOGGER.debug('update_push_token msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
+    push_token_hash = cast(str, msg.get('push_token_hash'))
     hass.async_create_task(
         _check_push_token(
             hass,
@@ -468,7 +470,7 @@ async def _verify_push_session(
         vol.Required('type'): 'domika/verify_push_session',
         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('verification_key'): str,
-        vol.Optional('push_token_hash'): str,
+        vol.Required('push_token_hash'): str,
     },
 )
 @async_response
@@ -493,7 +495,7 @@ async def websocket_domika_verify_push_session(
         _verify_push_session(
             cast(uuid.UUID, msg.get('app_session_id')),
             cast(str, msg.get('verification_key')),
-            cast(str, msg.get('push_token_hash') or ""),
+            cast(str, msg.get('push_token_hash')),
         ),
         'verify_push_session',
     )

@@ -41,6 +41,11 @@ async def get_all_with_push_token_hash(db_session: AsyncSession, push_token_hash
     return (await db_session.scalars(stmt)).all()
 
 
+async def check_push_token_hash(db_session: AsyncSession, app_session_id: uuid.UUID, push_token_hash: str) -> bool:
+    stmt = select(Device).where(Device.app_session_id == app_session_id).where(Device.push_token_hash == push_token_hash)
+    return len((await db_session.scalars(stmt)).all()) > 0
+
+
 async def remove_all_with_push_token_hash(
     db_session: AsyncSession,
     push_token_hash: str,

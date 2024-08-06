@@ -139,6 +139,8 @@ async def update_app_session_id(
     return new_app_session_id, result_old_app_sessions
 
 
+# Obsolete, do not use anymore. Check is now local on Integration.
+"""
 async def check_push_token(
         db_session: AsyncSession,
         app_session_id: uuid.UUID,
@@ -146,7 +148,7 @@ async def check_push_token(
         environment: str,
         push_token: str,
 ) -> bool:
-    """
+
     Check that push session exists, and associated push token is not changed.
 
     If push session id is not found on push server - it will be implicitly deleted for device with
@@ -170,7 +172,7 @@ async def check_push_token(
         push_server_errors.BadRequestError: if push server response with bad request.
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
-    """
+
     device = await get(db_session, app_session_id)
     if not device:
         raise errors.AppSessionIdNotFoundError(app_session_id)
@@ -227,6 +229,7 @@ async def check_push_token(
             raise push_server_errors.UnexpectedServerResponseError(resp.status)
     except aiohttp.ClientError as e:
         raise push_server_errors.PushServerError(str(e)) from None
+    """
 
 
 async def remove_push_session(

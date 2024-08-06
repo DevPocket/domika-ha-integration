@@ -26,13 +26,12 @@ from .. import errors, push_server_errors
 from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from .flow import (
-    check_push_token,
     create_push_session,
     remove_push_session,
     update_app_session_id,
     verify_push_session, get_hass_network_properties,
 )
-from .service import delete
+from .service import delete, check_push_token_hash
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -81,68 +80,24 @@ async def websocket_domika_update_app_session(
 async def _check_push_token(
     hass: HomeAssistant,
     app_session_id: uuid.UUID,
-    platform: str,
-    environment: str,
-    push_token_hex: str,
+    push_token_hash: str,
 ):
-    event_result: dict[str, Any] | None = None
-    try:
-        async with AsyncSessionFactory() as session:
-            if await check_push_token(
-                session,
-                app_session_id,
-                platform,
-                environment,
-                push_token_hex,
-            ):
-                event_result = {
-                    'd.type': 'push_activation',
-                    'push_activation_success': True,
-                }
-                LOGGER.info('Push token "%s" check. OK', push_token_hex)
-            else:
-                LOGGER.info('Push token "%s" check. Need validation', push_token_hex)
-    except errors.AppSessionIdNotFoundError:
-        LOGGER.error(
-            'Can\'t check push token "%s". App session id "%s" not found',
-            push_token_hex,
-            app_session_id,
-        )
-        event_result = {
-            'd.type': 'push_activation',
-            'invalid_app_session_id': True,
-        }
-    except errors.PushSessionIdNotFoundError:
-        LOGGER.info('Can\'t check push token "%s". Missing push session id', push_token_hex)
-        event_result = {
-            'd.type': 'push_activation',
-            'push_activation_success': False,
-        }
-    except push_server_errors.PushSessionIdNotFoundError as e:
-        LOGGER.error('Can\'t check push token "%s". %s', push_token_hex, e)
-        event_result = {
-            'd.type': 'push_activation',
-            'push_activation_success': False,
-        }
-    except (
-        push_server_errors.UnexpectedServerResponseError,
-        push_server_errors.BadRequestError,
-    ) as e:
-        LOGGER.error('Can\'t check push token "%s". Push server error. %s', push_token_hex, e)
-        event_result = {
-            'd.type': 'push_activation',
-            'push_activation_success': False,
-        }
-    except push_server_errors.PushServerError as e:
-        LOGGER.error('Can\'t check push token "%s". Push server error. %s', push_token_hex, e)
-    except sqlalchemy.exc.SQLAlchemyError as e:
-        LOGGER.error('Can\'t check push token "%s". Database error. %s', push_token_hex, e)
-    except Exception as e:
-        LOGGER.exception('Can\'t check push token "%s". Unhandled error. %s', push_token_hex, e)
+    async with AsyncSessionFactory() as session:
+        if await check_push_token_hash(session, app_session_id, push_token_hash):
+            event_result = {
+                'd.type': 'push_activation',
+                'push_activation_success': True,
+            }
+            LOGGER.info('Push token hash "%s" check. OK', push_token_hash)
+        else:
+            event_result = {
+                'd.type': 'push_activation',
+                'push_activation_success': False,
+            }
+            LOGGER.info('Push token hash "%s" check. Need validation', push_token_hash)
 
-    if event_result:
-        LOGGER.debug('### domika_%s, %s', app_session_id, event_result)
-        hass.bus.async_fire(f'domika_{app_session_id}', event_result)
+    LOGGER.debug('### domika_%s, %s, %s', app_session_id, push_token_hash, event_result)
+    hass.bus.async_fire(f'domika_{app_session_id}', event_result)
 
 
 @websocket_command(
@@ -150,10 +105,6 @@ async def _check_push_token(
         vol.Required('type'): 'domika/update_push_token',
         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
         vol.Required('push_token_hash'): str,
-        # Obsolete, left for old app versions compatibility only
-        vol.Optional('push_token_hex'): str,
-        vol.Optional('platform'): vol.Any('ios', 'android', 'huawei'),
-        vol.Optional('environment'): vol.Any('sandbox', 'production'),
     },
 )
 @async_response
@@ -174,14 +125,11 @@ async def websocket_domika_update_push_token(
     connection.send_result(msg_id, {'result': 'accepted'})
     LOGGER.debug('update_push_token msg_id=%s data=%s', msg_id, {'result': 'accepted'})
 
-    push_token_hash = cast(str, msg.get('push_token_hash'))
     hass.async_create_task(
         _check_push_token(
             hass,
             cast(uuid.UUID, msg.get('app_session_id')),
-            cast(str, msg.get('platform')),
-            cast(str, msg.get('environment')),
-            cast(str, msg.get('push_token_hex')),
+            cast(str, msg.get('push_token_hash')),
         ),
         'check_push_token',
     )

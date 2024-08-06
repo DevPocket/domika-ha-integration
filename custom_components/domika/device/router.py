@@ -149,10 +149,11 @@ async def _check_push_token(
     {
         vol.Required('type'): 'domika/update_push_token',
         vol.Required('app_session_id'): vol.Coerce(uuid.UUID),
-        vol.Required('push_token_hex'): str,
-        vol.Required('platform'): vol.Any('ios', 'android', 'huawei'),
-        vol.Required('environment'): vol.Any('sandbox', 'production'),
         vol.Required('push_token_hash'): str,
+        # Obsolete, left for old app versions compatibility only
+        vol.Optional('push_token_hex'): str,
+        vol.Optional('platform'): vol.Any('ios', 'android', 'huawei'),
+        vol.Optional('environment'): vol.Any('sandbox', 'production'),
     },
 )
 @async_response

@@ -27,6 +27,7 @@ from .service import create, get, update, delete, remove_all_with_push_token_has
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
+
 async def get_hass_network_properties(hass: HomeAssistant) -> dict:
     instance_name = hass.config.location_name
     cloud_url: str | None = None
@@ -43,7 +44,7 @@ async def get_hass_network_properties(hass: HomeAssistant) -> dict:
         local_url = f"http://{host_info['hostname']}.local:{port}"
 
     if "cloud" in hass.config.components:
-        from homeassistant.components.cloud import (CloudNotAvailable, async_remote_ui_url,)
+        from homeassistant.components.cloud import (CloudNotAvailable, async_remote_ui_url, )
         try:
             cloud_url = async_remote_ui_url(hass)
             if hass.data[CLOUD_DOMAIN]:
@@ -73,11 +74,12 @@ async def get_hass_network_properties(hass: HomeAssistant) -> dict:
         result["certificate_fingerprint"] = certificate_fingerprint
     return result
 
+
 async def update_app_session_id(
-    db_session: AsyncSession,
-    app_session_id: uuid.UUID | None,
-    user_id: str,
-    push_token_hash: str,
+        db_session: AsyncSession,
+        app_session_id: uuid.UUID | None,
+        user_id: str,
+        push_token_hash: str,
 ) -> (uuid.UUID, [str]):
     """
     Update or create app session id.
@@ -95,7 +97,6 @@ async def update_app_session_id(
         If the session exists - returns app_session_id. Otherwise, returns newly created session id.
     """
     new_app_session_id: uuid.UUID | None = None
-    result_old_app_sessions: [str] = []
 
     if app_session_id:
         # Try to find the proper record.
@@ -114,7 +115,6 @@ async def update_app_session_id(
                 # If found but user_id mismatch - remove app_session.
                 await delete(db_session, app_session_id)
 
-
     if not new_app_session_id:
         # If not found - create new one.
         device = await create(
@@ -128,21 +128,23 @@ async def update_app_session_id(
         )
         new_app_session_id = device.app_session_id
 
-    old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
-    result_old_app_sessions = [
-        device.app_session_id for device in old_devices
+    result_old_app_sessions: [str] = []
+    if push_token_hash:
+        old_devices = await get_all_with_push_token_hash(db_session, push_token_hash=push_token_hash)
+        result_old_app_sessions = [
+            device.app_session_id for device in old_devices
             if device.app_session_id != new_app_session_id
-    ]
+        ]
 
     return new_app_session_id, result_old_app_sessions
 
 
 async def check_push_token(
-    db_session: AsyncSession,
-    app_session_id: uuid.UUID,
-    platform: str,
-    environment: str,
-    push_token: str,
+        db_session: AsyncSession,
+        app_session_id: uuid.UUID,
+        platform: str,
+        environment: str,
+        push_token: str,
 ) -> bool:
     """
     Check that push session exists, and associated push token is not changed.
@@ -228,8 +230,8 @@ async def check_push_token(
 
 
 async def remove_push_session(
-    db_session: AsyncSession,
-    app_session_id: uuid.UUID,
+        db_session: AsyncSession,
+        app_session_id: uuid.UUID,
 ) -> uuid.UUID:
     """
     Remove push session from push server.
@@ -283,11 +285,11 @@ async def remove_push_session(
 
 
 async def create_push_session(
-    original_transaction_id: str,
-    platform: str,
-    environment: str,
-    push_token: str,
-    app_session_id: str,
+        original_transaction_id: str,
+        platform: str,
+        environment: str,
+        push_token: str,
+        app_session_id: str,
 ):
     """
     Initialize push session creation flow on the push server.
@@ -336,10 +338,10 @@ async def create_push_session(
 
 
 async def verify_push_session(
-    db_session: AsyncSession,
-    app_session_id: uuid.UUID,
-    verification_key: str,
-    push_token_hash: str,
+        db_session: AsyncSession,
+        app_session_id: uuid.UUID,
+        verification_key: str,
+        push_token_hash: str,
 
 ) -> uuid.UUID:
     """
@@ -389,8 +391,9 @@ async def verify_push_session(
                 except ValueError:
                     msg = 'Malformed push_session_id.'
                     raise push_server_errors.ResponseError(msg) from None
-                # Remove Devices with the same push_token_hash, except current device.
-                await remove_all_with_push_token_hash(db_session, push_token_hash, device)
+                # Remove Devices with the same push_token_hash (if not empty), except current device.
+                if push_token_hash:
+                    await remove_all_with_push_token_hash(db_session, push_token_hash, device)
                 # Update push_session_id and push_token_hash.
                 await update(
                     db_session,

@@ -156,7 +156,7 @@ async def websocket_domika_get_dashboards(
     )
 
     connection.send_result(msg_id, result)
-    LOGGER.debug('update_dashboards msg_id=%s data=%s', msg_id, result)
+    LOGGER.debug('update_dashboards msg_id=%s', msg_id)
 
 
 @websocket_command(

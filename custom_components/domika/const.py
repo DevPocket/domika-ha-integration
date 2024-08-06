@@ -8,7 +8,7 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "Domika"
+DOMAIN = "domika"
 MAIN_LOGGER_NAME = DOMAIN
 
 

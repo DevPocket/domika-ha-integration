@@ -48,7 +48,8 @@ def websocket_domika_entity_list(
     result = entities.to_dict()
 
     connection.send_result(msg_id, result)
-    LOGGER.debug("entity_list msg_id=%s data=%s", msg_id, result)
+    # LOGGER.debug("entity_list msg_id=%s data=%s", msg_id, result)
+    LOGGER.debug("entity_list msg_id=%s", msg_id)
 
 
 @websocket_command(

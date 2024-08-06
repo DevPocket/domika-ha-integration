@@ -92,7 +92,7 @@ async def websocket_domika_update_dashboards(
     LOGGER.debug(
         'Got websocket message "update_dashboards", user: "%s", data: %s',
         connection.user.id,
-        msg,
+        msg.get('hash'),
     )
 
     # Fast send reply.

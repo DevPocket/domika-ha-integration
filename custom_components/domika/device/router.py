@@ -31,7 +31,7 @@ from .flow import (
     update_app_session_id,
     verify_push_session, get_hass_network_properties,
 )
-from .service import delete, check_push_token_hash
+from .service import get, delete, check_push_token_hash
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -83,7 +83,8 @@ async def _check_push_token(
     push_token_hash: str,
 ):
     async with AsyncSessionFactory() as session:
-        if await check_push_token_hash(session, app_session_id, push_token_hash):
+        device = await get(session, app_session_id)
+        if device.push_session_id and device.push_token_hash == push_token_hash:
             event_result = {
                 'd.type': 'push_activation',
                 'push_activation_success': True,

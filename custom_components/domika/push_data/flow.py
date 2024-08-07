@@ -86,10 +86,11 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     if not attributes:
         return
 
-    is_critical = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL)
+    # Check if it's a critical or warning binary sensor.
+    is_critical_or_warning = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.ANY)
 
     # Fire event for application if critical sensor changed it's state.
-    if is_critical:
+    if is_critical_or_warning:
         # If entity id is a critical binary sensor.
         # Fetch state for all levels of critical binary sensors.
         sensors_data = critical_sensor_service.get(hass, CriticalityLevel.ANY)
@@ -144,7 +145,8 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
                 app_session_ids,
             )
 
-        if is_critical:
+        is_critical = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL)
+        if is_critical and ('s', 'on') in attributes:
             verified_devices = await device_service.get_all_with_push_session_id(session)
 
             # Create events dict for critical push.

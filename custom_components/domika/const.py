@@ -33,8 +33,6 @@ CRITICAL_SENSORS_DEVICE_ENUMS = [
     BinarySensorDeviceClass.GAS,
     BinarySensorDeviceClass.MOISTURE,
     BinarySensorDeviceClass.SMOKE,
-    BinarySensorDeviceClass.SAFETY,
-    BinarySensorDeviceClass.TAMPER,
 ]
 
 WARNING_SENSORS_DEVICE_ENUMS = [
@@ -43,6 +41,8 @@ WARNING_SENSORS_DEVICE_ENUMS = [
     BinarySensorDeviceClass.HEAT,
     BinarySensorDeviceClass.PROBLEM,
     BinarySensorDeviceClass.VIBRATION,
+    BinarySensorDeviceClass.SAFETY,
+    BinarySensorDeviceClass.TAMPER,
 ]
 
 CRITICAL_SENSORS_DEVICE_CLASSES = [str(e) for e in CRITICAL_SENSORS_DEVICE_ENUMS]

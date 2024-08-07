@@ -102,7 +102,7 @@ def criticality_level(
         entity_id: homeassistant entity id.
 
     Returns:
-        entitie's criticality level if entity is critical binary sensor, None otherwise.
+        entity's criticality level if entity is critical binary sensor, None otherwise.
     """
     if not entity_id.startswith('binary_sensor.'):
         return None

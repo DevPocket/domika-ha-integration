@@ -18,7 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components import network
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
-from homeassistant.components.cloud import DOMAIN as CLOUD_DOMAIN
+from homeassistant.components.cloud.const import DOMAIN as CLOUD_DOMAIN
 
 from .. import errors, push_server_errors, statuses
 from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL

@@ -36,6 +36,7 @@ class PushData(AsyncBase):
     value: Mapped[str]
     context_id: Mapped[str]
     timestamp: Mapped[int] = mapped_column(server_default=func.datetime('now'))
+    delay: Mapped[int]
 
 
 class _Event(AsyncBase):
@@ -49,11 +50,13 @@ class _Event(AsyncBase):
     value: Mapped[str]
     context_id: Mapped[str]
     timestamp: Mapped[int] = mapped_column(server_default=func.datetime('now'))
+    delay: Mapped[int]
+
 
 
 @dataclass
-class DomikaPushDataBase(DataClassJSONMixin):
-    """Base push data model."""
+class DomikaEventBase(DataClassJSONMixin):
+    """Base event model."""
 
     event_id: uuid.UUID = field(
         metadata={
@@ -65,18 +68,12 @@ class DomikaPushDataBase(DataClassJSONMixin):
     value: str
     context_id: str
     timestamp: int
+    delay: int
 
 
 @dataclass
-class DomikaPushDataCreate(DomikaPushDataBase):
+class DomikaEventCreate(DomikaEventBase):
     """Push data create model."""
-
-
-@dataclass
-class DomikPushDataRead(DomikaPushDataCreate):
-    """Push data read model."""
-
-    app_session_id: str
 
 
 @dataclass

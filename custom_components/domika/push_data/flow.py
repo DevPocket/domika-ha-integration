@@ -27,8 +27,8 @@ from ..device import service as device_service
 from ..device.models import Device, DomikaDeviceUpdate
 from ..subscription.flow import get_app_session_id_by_attributes
 from ..utils import flatten_json
-from .models import DomikaPushDataCreate, PushData
-from .service import create, delete_all
+from .models import PushData, DomikaEventCreate
+from .service import create, delete_all, decrease_delay_all, delete_by_app_session_id, get_delay_by_entity_id
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -113,21 +113,23 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
 
     # Store events into db.
     event_id = uuid.uuid4()
+    delay = await get_delay_by_entity_id(hass, entity_id)
     # TODO: use timestamp from event. event.time_fired.timestamp() * 1e6
-    push_data = [
-        DomikaPushDataCreate(
-            event_id,
-            entity_id,
-            attribute[0],
-            attribute[1],
-            event.context.id,
-            int(event.time_fired.timestamp() * 1e6),
+    events = [
+        DomikaEventCreate(
+            event_id=event_id,
+            entity_id=entity_id,
+            attribute=attribute[0],
+            value=attribute[1],
+            context_id=event.context.id,
+            timestamp=int(event.time_fired.timestamp() * 1e6),
+            delay=delay
         )
         for attribute in attributes
     ]
     async with AsyncSessionFactory() as session:
         # Create push_data.
-        await create(session, push_data)
+        await create(session, events)
         app_session_ids = await get_app_session_id_by_attributes(
             session,
             entity_id,
@@ -162,7 +164,7 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
             events_dict = {}
             entity = {}
             events_dict[entity_id] = entity
-            for pd in push_data:
+            for pd in events:
                 entity[pd.attribute] = {
                     'v': pd.value,
                     't': pd.timestamp,
@@ -239,23 +241,26 @@ async def _send_push_data(
 
 async def push_registered_events():
     async with AsyncSessionFactory() as session:
+        await decrease_delay_all(session)
+
         # TODO: add check for elapsed time.
         stmt = sqlalchemy.select(PushData, Device.push_session_id)
         stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
         stmt = stmt.where(Device.push_session_id.is_not(None))
-        stmt = stmt.group_by(
-            PushData.app_session_id,
-            PushData.entity_id,
-            PushData.attribute,
-        )
-        stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
+        # No reason to group by these fields — there is a unique constraint exactly for them.
+        # stmt = stmt.group_by(
+        #     PushData.app_session_id,
+        #     PushData.entity_id,
+        #     PushData.attribute,
+        # )
+        # stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
         stmt = stmt.order_by(
-            PushData.app_session_id,
+            Device.push_session_id,
             PushData.entity_id,
         )
-        events = (await session.execute(stmt)).all()
+        push_data_records = (await session.execute(stmt)).all()
 
-        # Create events dict.
+        # Create push data dict.
         # Format example:
         # '{
         # '  "binary_sensor.smoke": {
@@ -271,40 +276,51 @@ async def push_registered_events():
         # '     }
         # '  },
         # '}
+        app_sessions_ids_to_delete_list: [uuid.UUID] = []
         events_dict = {}
         current_entity_id: str | None = None
         current_push_session_id: uuid.UUID | None = None
         current_app_session_id: uuid.UUID | None = None
+        found_delay_zero: bool = False
 
         entity = {}
-        for event in events:
-            if current_push_session_id != event[1]:
-                current_push_session_id = event[1]
-                current_app_session_id = event[0].app_session_id
-                if events_dict and current_push_session_id:
+        for push_data_record in push_data_records:
+            LOGGER.debug(">>> push_data_record=%s, %s", push_data_record[0], push_data_record[1])
+            if current_app_session_id != push_data_record[0].app_session_id:
+                LOGGER.debug(">>> is it time to send pushes? found_delay_zero=%s, events_dict=%s, current_push_session_id=%s", found_delay_zero, events_dict, current_push_session_id)
+                if found_delay_zero and events_dict and current_push_session_id:
                     await _send_push_data(
                         session,
                         current_app_session_id,  # type: ignore
                         current_push_session_id,
                         events_dict,
                     )
+                    app_sessions_ids_to_delete_list.append(current_app_session_id)
+                current_push_session_id = push_data_record[1]
+                current_app_session_id = push_data_record[0].app_session_id
                 current_entity_id = None
                 events_dict = {}
-            if current_entity_id != event[0].entity_id:
+                found_delay_zero = False
+            if current_entity_id != push_data_record[0].entity_id:
                 entity = {}
-                events_dict[event[0].entity_id] = entity
-                current_entity_id = event[0].entity_id
-            entity[event[0].attribute] = {
-                'v': event[0].value,
-                't': event[0].timestamp,
+                events_dict[push_data_record[0].entity_id] = entity
+                current_entity_id = push_data_record[0].entity_id
+            entity[push_data_record[0].attribute] = {
+                'v': push_data_record[0].value,
+                't': push_data_record[0].timestamp,
             }
+            found_delay_zero = found_delay_zero or (push_data_record[0].delay == 0)
 
-        if events_dict and current_push_session_id:
+        LOGGER.debug(">>> is it time to send pushes? found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
+                     found_delay_zero, events_dict, current_push_session_id)
+        if found_delay_zero and events_dict and current_push_session_id:
             await _send_push_data(
                 session,
                 current_app_session_id,  # type: ignore
                 current_push_session_id,
                 events_dict,
             )
+            app_sessions_ids_to_delete_list.append(current_app_session_id)
 
-        await delete_all(session)
+        LOGGER.debug(">>> delete_by_app_session_id: app_sessions_ids_to_delete_list=%s", app_sessions_ids_to_delete_list)
+        await delete_by_app_session_id(session, app_sessions_ids_to_delete_list)

@@ -20,8 +20,8 @@ from typing import Any, cast
 
 async def test_subscriptions():
     # Create some app_sessions
-    app_session_id1, _ = await update_app_session_id(db_session, "", USER_ID1, "")
-    app_session_id2, _ = await update_app_session_id(db_session, "", USER_ID2, "")
+    app_session_id1, _ = await update_app_session_id(db_session, None, USER_ID1, "")
+    app_session_id2, _ = await update_app_session_id(db_session, None, USER_ID2, "")
 
     # Create some subscriptions
     await resubscribe(db_session, app_session_id1,

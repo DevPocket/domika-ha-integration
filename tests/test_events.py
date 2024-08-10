@@ -9,7 +9,7 @@ Author(s): Michael Bogorad
 
 from tests_init import *
 from custom_components.domika.device.flow import update_app_session_id
-from custom_components.domika.push_data.models import DomikaPushDataCreate, PushData
+from custom_components.domika.push_data.models import PushData, DomikaEventCreate
 from custom_components.domika.push_data.flow import register_event
 from custom_components.domika.push_data.service import create, delete
 from custom_components.domika.subscription.flow import resubscribe, get_push_attributes, get_app_session_id_by_attributes
@@ -43,9 +43,9 @@ async def test_events():
 
     # Create 3 similar events
     push_data = [
-        DomikaPushDataCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id1", 1),
-        DomikaPushDataCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id1", 1),
-        DomikaPushDataCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id2", 2),
+        DomikaEventCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id1", 1),
+        DomikaEventCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id1", 1),
+        DomikaEventCreate(uuid.uuid4(), "entity2", "attr2_1", "on", "event_context_id2", 2),
     ]
     res = await create(db_session, push_data, returning=True)
     # Check that 2 push_data records has been added.
@@ -53,9 +53,9 @@ async def test_events():
 
     # Create events
     push_data = [
-        DomikaPushDataCreate(uuid.uuid4(), "entity1", "attr1_1", "on", "event_context_id3", 3),
-        DomikaPushDataCreate(uuid.uuid4(), "entity1", "attr1_2", "on", "event_context_id4", 4),
-        DomikaPushDataCreate(uuid.uuid4(), "entity3", "attr3_1", "on", "event_context_id5", 6),
+        DomikaEventCreate(uuid.uuid4(), "entity1", "attr1_1", "on", "event_context_id3", 3),
+        DomikaEventCreate(uuid.uuid4(), "entity1", "attr1_2", "on", "event_context_id4", 4),
+        DomikaEventCreate(uuid.uuid4(), "entity3", "attr3_1", "on", "event_context_id5", 6),
     ]
     res = await create(db_session, push_data, returning=True)
     # Check that 3 additional push_data records has been added (5 total).
@@ -80,9 +80,9 @@ async def test_events_confirmation():
     event_id3 = uuid.uuid4()
     # Create 3 similar events
     push_data = [
-        DomikaPushDataCreate(event_id1, "entity1", "attr1_1", "on", "event_context_id1", 1),
-        DomikaPushDataCreate(event_id2, "entity2", "attr2_1", "on", "event_context_id1", 1),
-        DomikaPushDataCreate(event_id3, "entity3", "attr3_1", "on", "event_context_id2", 2),
+        DomikaEventCreate(event_id1, "entity1", "attr1_1", "on", "event_context_id1", 1),
+        DomikaEventCreate(event_id2, "entity2", "attr2_1", "on", "event_context_id1", 1),
+        DomikaEventCreate(event_id3, "entity3", "attr3_1", "on", "event_context_id2", 2),
     ]
     res = await create(db_session, push_data, returning=True)
     # Check that 4 push_data records has been added.

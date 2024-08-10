@@ -13,12 +13,14 @@ from collections.abc import Sequence
 
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect
+from homeassistant.core import HomeAssistant
 from sqlalchemy import and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..device.models import Device
 from ..subscription.models import Subscription
-from .models import DomikaPushDataCreate, DomikaPushDataUpdate, PushData, _Event
+from .models import DomikaPushDataUpdate, PushData, _Event, DomikaEventCreate
+from ..const import PUSH_DELAY_DEFAULT, PUSH_DELAY_FOR_DOMAIN
 
 
 async def get(
@@ -30,37 +32,9 @@ async def get(
     return (await db_session.scalars(stmt)).all()
 
 
-async def get_by_platform(
-    db_session: AsyncSession,
-    platform: str,
-) -> Sequence[PushData]:
-    """
-    Get all push data for given platform.
-
-    If there are more than one event for the app_session_id/entity_id/attribute binding, returns
-    last one.
-    """
-    # TODO: add check for elapsed time.
-    stmt = sqlalchemy.select(PushData)
-    stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
-    # TODO: uncomment.
-    # stmt = stmt.where(Device.platform == platform)
-    stmt = stmt.group_by(
-        PushData.app_session_id,
-        PushData.entity_id,
-        PushData.attribute,
-    )
-    stmt = stmt.having(PushData.timestamp == sqlalchemy.func.max(PushData.timestamp))
-    stmt = stmt.order_by(
-        PushData.app_session_id,
-        PushData.entity_id,
-    )
-    return (await db_session.scalars(stmt)).all()
-
-
 async def create(
     db_session: AsyncSession,
-    push_data_in: list[DomikaPushDataCreate],
+    events_in: list[DomikaEventCreate],
     *,
     commit: bool = True,
     returning: bool = False,
@@ -75,7 +49,7 @@ async def create(
     # Insert temporary homeassistant events.
     await db_session.execute(
         sqlalchemy.insert(_Event),
-        [pd.to_dict() for pd in push_data_in],
+        [pd.to_dict() for pd in events_in],
     )
 
     # Select events which need to be pushed.
@@ -87,6 +61,7 @@ async def create(
         _Event.value,
         _Event.context_id,
         _Event.timestamp,
+        _Event.delay,
     )
     sel = sel.join(
         Subscription,
@@ -107,6 +82,7 @@ async def create(
             _Event.value,
             _Event.context_id,
             _Event.timestamp,
+            _Event.delay,
         ],
         sel,
     )
@@ -188,6 +164,38 @@ async def delete_all(
         await db_session.commit()
 
 
+async def delete_by_app_session_id(
+    db_session: AsyncSession,
+    app_session_id: uuid.UUID | list[uuid.UUID],
+    *,
+    commit: bool = True,
+):
+    """Delete push data by event id, or list of event id's."""
+    if isinstance(app_session_id, list):
+        stmt = sqlalchemy.delete(PushData).where(PushData.app_session_id.in_(app_session_id))
+    else:
+        stmt = sqlalchemy.delete(PushData).where(PushData.app_session_id == app_session_id)
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
+async def decrease_delay_all(
+    db_session: AsyncSession,
+    *,
+    commit: bool = True,
+):
+    """Decrease delay for all push data records with delay > 0"""
+    stmt = sqlalchemy.update(PushData)
+    stmt = stmt.where(PushData.delay > 0)
+    stmt = stmt.values(delay=PushData.delay-1)
+    await db_session.execute(stmt)
+
+    if commit:
+        await db_session.commit()
+
+
 async def delete_for_app_session(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
@@ -200,3 +208,12 @@ async def delete_for_app_session(
 
     if commit:
         await db_session.commit()
+
+
+async def get_delay_by_entity_id(hass: HomeAssistant, entity_id: str) -> int:
+    """Get push notifications delay by entity id."""
+    state = hass.states.get(entity_id)
+    if not state:
+        return PUSH_DELAY_DEFAULT
+
+    return PUSH_DELAY_FOR_DOMAIN.get(state.domain, PUSH_DELAY_DEFAULT)

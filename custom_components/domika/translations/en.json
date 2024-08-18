@@ -1,0 +1,22 @@
+{
+    "title": "Domika",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Bla bla config title"
+            }
+        },
+        "abort": {
+            "already_configured": "[%key:common::config_flow::abort::already_configured_service%]"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "critical_included_entity_ids": "Critical sensor entity ids:"
+                }
+            }
+        }
+    }
+}

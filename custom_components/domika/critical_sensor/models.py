@@ -1,6 +1,6 @@
 # vim: set fileencoding=utf-8
 """
-Critical sensor.
+Notification sensor.
 
 (c) DevPocket, 2024
 
@@ -12,15 +12,15 @@ from dataclasses import dataclass, field
 
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from .enums import CriticalityLevel
+from .enums import NotificationType
 
 
 @dataclass
-class DomikaCriticalSensor(DataClassJSONMixin):
-    """Critical sensor data."""
+class DomikaNotificationSensor(DataClassJSONMixin):
+    """Notification sensor data."""
 
     entity_id: str
-    type: CriticalityLevel = field(metadata={'serialize': lambda v: v.to_string()})
+    type: NotificationType = field(metadata={'serialize': lambda v: v.to_string()})
     name: str
     device_class: str
     state: str
@@ -28,8 +28,8 @@ class DomikaCriticalSensor(DataClassJSONMixin):
 
 
 @dataclass
-class DomikaCriticalSensorsRead(DataClassJSONMixin):
-    """Critical sensors read model."""
+class DomikaNotificationSensorsRead(DataClassJSONMixin):
+    """Notification sensors read model."""
 
-    sensors: list[DomikaCriticalSensor]
+    sensors: list[DomikaNotificationSensor]
     sensors_on: list[str]

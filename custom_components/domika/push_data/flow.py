@@ -19,16 +19,16 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import push_server_errors, statuses
-from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
-from ..critical_sensor import service as critical_sensor_service
-from ..critical_sensor.enums import CriticalityLevel
+from ..const import DOMAIN, MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
+from ..critical_sensor import service as notifications_sensor_service
+from ..critical_sensor.enums import NotificationType
 from ..database.core import AsyncSessionFactory
 from ..device import service as device_service
 from ..device.models import Device, DomikaDeviceUpdate
 from ..subscription.flow import get_app_session_id_by_attributes
 from ..utils import flatten_json
 from .models import PushData, DomikaEventCreate
-from .service import create, delete_all, decrease_delay_all, delete_by_app_session_id, get_delay_by_entity_id
+from .service import create, decrease_delay_all, delete_by_app_session_id, get_delay_by_entity_id
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
@@ -70,6 +70,10 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     if not event_data:
         return
 
+    domain_data = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities") if domain_data else None
+    LOGGER.debug("-----> critical_entities %s", critical_entities)
+
     entity_id = event_data['entity_id']
     old_state = event_data['old_state'].as_compressed_state if event_data['old_state'] else {}
     new_state = event_data['new_state'].as_compressed_state if event_data['new_state'] else {}
@@ -87,13 +91,13 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
         return
 
     # Check if it's a critical or warning binary sensor.
-    is_critical_or_warning = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.ANY)
+    notification_required = notifications_sensor_service.check_notification_type(hass, entity_id, NotificationType.ANY)
 
-    # Fire event for application if critical sensor changed it's state.
-    if is_critical_or_warning:
+    # Fire event for application if important sensor changed it's state.
+    if notification_required:
         # If entity id is a critical binary sensor.
         # Fetch state for all levels of critical binary sensors.
-        sensors_data = critical_sensor_service.get(hass, CriticalityLevel.ANY)
+        sensors_data = notifications_sensor_service.get(hass, NotificationType.ANY)
         # Fire the event for app.
         hass.bus.async_fire(
             DOMIKA_CRITICAL_SENSOR_CHANGED,
@@ -147,8 +151,8 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
                 app_session_ids,
             )
 
-        is_critical = critical_sensor_service.is_critical(hass, entity_id, CriticalityLevel.CRITICAL)
-        if is_critical and ('s', 'on') in attributes:
+        critical_push_needed = notifications_sensor_service.critical_push_needed(hass, entity_id)
+        if critical_push_needed and ('s', 'on') in attributes:
             verified_devices = await device_service.get_all_with_push_session_id(session)
 
             # Create events dict for critical push.

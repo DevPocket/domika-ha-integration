@@ -17,7 +17,7 @@ from homeassistant.components.websocket_api.decorators import websocket_command
 from homeassistant.core import HomeAssistant, callback
 
 from ..const import MAIN_LOGGER_NAME
-from ..critical_sensor.enums import CriticalityLevel
+from ..critical_sensor.enums import NotificationType
 from .service import get
 
 LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
@@ -42,7 +42,7 @@ def websocket_domika_critical_sensors(
 
     LOGGER.debug('Got websocket message "critical_sensors", data: %s', msg)
 
-    sensors_data = get(hass, CriticalityLevel.ANY)
+    sensors_data = get(hass, NotificationType.ANY)
     result = sensors_data.to_dict()
 
     connection.send_result(msg_id, result)

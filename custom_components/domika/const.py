@@ -28,14 +28,14 @@ PUSH_SERVER_TIMEOUT = 10
 
 SENSORS_DOMAIN = "binary_sensor"
 
-CRITICAL_SENSORS_DEVICE_ENUMS = [
+CRITICAL_NOTIFICATION_SENSORS = [
     BinarySensorDeviceClass.CO,
     BinarySensorDeviceClass.GAS,
     BinarySensorDeviceClass.MOISTURE,
     BinarySensorDeviceClass.SMOKE,
 ]
 
-WARNING_SENSORS_DEVICE_ENUMS = [
+WARNING_NOTIFICATION_SENSORS = [
     BinarySensorDeviceClass.BATTERY,
     BinarySensorDeviceClass.COLD,
     BinarySensorDeviceClass.HEAT,
@@ -45,8 +45,15 @@ WARNING_SENSORS_DEVICE_ENUMS = [
     BinarySensorDeviceClass.TAMPER,
 ]
 
-CRITICAL_SENSORS_DEVICE_CLASSES = [str(e) for e in CRITICAL_SENSORS_DEVICE_ENUMS]
-WARNING_SENSORS_DEVICE_CLASSES = [str(e) for e in WARNING_SENSORS_DEVICE_ENUMS]
+CRITICAL_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in CRITICAL_NOTIFICATION_SENSORS]
+WARNING_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in WARNING_NOTIFICATION_SENSORS]
+
+CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
+    'smoke_select_all': BinarySensorDeviceClass.SMOKE,
+    'moisture_select_all': BinarySensorDeviceClass.MOISTURE,
+    'co_select_all': BinarySensorDeviceClass.CO,
+    'gas_select_all': BinarySensorDeviceClass.GAS
+}
 
 PUSH_DELAY_DEFAULT = 0
 PUSH_DELAY_FOR_DOMAIN = {'sensor': 4}

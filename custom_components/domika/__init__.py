@@ -35,6 +35,7 @@ from .device.models import Device
 from .push_data.models import PushData
 from .push_data.models import _Event
 from .subscription.models import Subscription
+
 # isort: on
 
 CONFIG_SCHEMA = config_validation.empty_config_schema(DOMAIN)
@@ -50,8 +51,23 @@ async def async_setup_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
     async_at_started(hass, _on_homeassistant_started)
     LOGGER.debug("Entry loaded")
 
-    LOGGER.debug("-----> %s", _entry.options)
+    if not hass.data.get(DOMAIN):
+        hass.data[DOMAIN] = {}
+    hass.data[DOMAIN]["critical_entities"] = _entry.options
+
+    _entry.async_on_unload(_entry.add_update_listener(config_update_listener))
     return True
+
+
+async def config_update_listener(hass: HomeAssistant, _entry: ConfigEntry):
+    """Handle options update."""
+    if not hass.data.get(DOMAIN):
+        hass.data[DOMAIN] = {}
+    hass.data[DOMAIN]["critical_entities"] = _entry.options
+
+    domain_data = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities") if domain_data else None
+    LOGGER.debug("-----> critical_entities %s", critical_entities)
 
 
 async def async_unload_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> bool:

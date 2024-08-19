@@ -11,8 +11,8 @@ Author(s): Artem Bezborodko
 import enum
 
 
-class CriticalityLevel(enum.Flag):
-    """Critical sensor criticality level."""
+class NotificationType(enum.Flag):
+    """Type of notification in app's header."""
 
     CRITICAL = enum.auto()
     WARNING = enum.auto()

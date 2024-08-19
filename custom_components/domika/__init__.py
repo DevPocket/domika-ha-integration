@@ -65,10 +65,6 @@ async def config_update_listener(hass: HomeAssistant, _entry: ConfigEntry):
         hass.data[DOMAIN] = {}
     hass.data[DOMAIN]["critical_entities"] = _entry.options
 
-    domain_data = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities") if domain_data else None
-    LOGGER.debug("-----> critical_entities %s", critical_entities)
-
 
 async def async_unload_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> bool:
     """Unload a config entry."""

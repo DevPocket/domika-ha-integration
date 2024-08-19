@@ -72,7 +72,6 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
 
     domain_data = hass.data.get(DOMAIN)
     critical_entities = domain_data.get("critical_entities") if domain_data else None
-    LOGGER.debug("-----> critical_entities %s", critical_entities)
 
     entity_id = event_data['entity_id']
     old_state = event_data['old_state'].as_compressed_state if event_data['old_state'] else {}

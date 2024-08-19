@@ -121,7 +121,7 @@ def critical_push_needed(hass: HomeAssistant, entity_id: str) -> bool:
     Returns:
         True user chose to get critical push notifications for this binary sensor.
     """
-    LOGGER.debug('critical_push_needed, entity_id: %s', entity_id)
+    # LOGGER.debug('critical_push_needed, entity_id: %s', entity_id)
 
     if not entity_id.startswith('binary_sensor.'):
         return False
@@ -131,16 +131,16 @@ def critical_push_needed(hass: HomeAssistant, entity_id: str) -> bool:
     critical_included_entity_ids = critical_entities.get('critical_included_entity_ids', [])
     # If user manually added entity to the list for critical pushes — return True.
     if entity_id in critical_included_entity_ids:
-        LOGGER.debug('found in critical_included_entity_ids, returning True')
+        # LOGGER.debug('found in critical_included_entity_ids, returning True')
         return True
 
     sensor = hass.states.get(entity_id)
     if not sensor:
-        LOGGER.debug('not found in hass, returning False')
+        # LOGGER.debug('not found in hass, returning False')
         return False
 
     sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
-    LOGGER.debug('sensor_class: %s', sensor_class)
+    # LOGGER.debug('sensor_class: %s', sensor_class)
 
     # {
     #   'smoke_select_all': True,
@@ -156,7 +156,7 @@ def critical_push_needed(hass: HomeAssistant, entity_id: str) -> bool:
     for (key, value) in critical_entities.items():
         if key in CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES and value:
             critical_device_classes_enabled.append(CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES[key])
-    LOGGER.debug('critical_device_classes_enabled: %s', critical_device_classes_enabled)
+    # LOGGER.debug('critical_device_classes_enabled: %s', critical_device_classes_enabled)
 
     return sensor_class in critical_device_classes_enabled
 

@@ -57,6 +57,10 @@ class OptionsFlowHandler(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Optional("smoke_select_all", default=False): bool,
+                    vol.Optional("moisture_select_all", default=False): bool,
+                    vol.Optional("co_select_all", default=False): bool,
+                    vol.Optional("gas_select_all", default=False): bool,
                     vol.Optional("critical_included_entity_ids", default=self.config_entry.options.get(
                         "critical_included_entity_ids",
                     ),): entity_selector,

@@ -49,6 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
     # Register homeassistant startup callback.
     async_at_started(hass, _on_homeassistant_started)
     LOGGER.debug("Entry loaded")
+
+    LOGGER.debug("-----> %s", _entry.options)
     return True
 
 

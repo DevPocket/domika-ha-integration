@@ -116,9 +116,12 @@ async def _on_homeassistant_started(hass: HomeAssistant):
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     """Set up component."""
-    # TODO: The real logger configuration is in yaml. Here we need to have the default, which is
-    # Warning or Error
-    LOGGER.setLevel(logging.DEBUG)
+    # LOGGER.setLevel(logging.DEBUG)
+    # To config proper logs level put the following into your configuration.yaml.
+    # logger:
+    #   default: info
+    #   logs:
+    #       domika: debug
 
     LOGGER.debug("Async setup")
 

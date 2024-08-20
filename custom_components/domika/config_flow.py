@@ -59,23 +59,20 @@ class OptionsFlowHandler(OptionsFlow):
                 {
                     vol.Optional(
                         schema="smoke_select_all",
-                        default=self.config_entry.options.get("smoke_select_all")
+                        default=self.config_entry.options.get("smoke_select_all") or False
                     ): bool,
                     vol.Optional(
                         schema="moisture_select_all",
-                        default=self.config_entry.options.get("moisture_select_all")
+                        default=self.config_entry.options.get("moisture_select_all") or False
                     ): bool,
                     vol.Optional(
                         schema="co_select_all",
-                        default=self.config_entry.options.get("co_select_all")
+                        default=self.config_entry.options.get("co_select_all") or False
                     ): bool,
                     vol.Optional(
                         schema="gas_select_all",
-                        default=self.config_entry.options.get("gas_select_all")
+                        default=self.config_entry.options.get("gas_select_all") or False
                     ): bool,
-                    # vol.Optional("moisture_select_all", default=False): bool,
-                    # vol.Optional("co_select_all", default=False): bool,
-                    # vol.Optional("gas_select_all", default=False): bool,
                     vol.Optional(
                         schema="critical_included_entity_ids",
                         default=self.config_entry.options.get("critical_included_entity_ids")

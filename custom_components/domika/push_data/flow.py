@@ -192,7 +192,7 @@ async def _send_push_data(
     *,
     critical: bool = False,
 ):
-    LOGGER.debug('Push %sevents. %s', 'critical ' if critical else '', events_dict)
+    LOGGER.debug('Push %sevents to %s. %s', 'critical ' if critical else '', push_session_id, events_dict)
 
     try:
         async with (

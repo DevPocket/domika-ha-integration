@@ -17,7 +17,7 @@ from homeassistant.helpers.typing import ConfigType
 from .api.domain_services_view import DomikaAPIDomainServicesView
 from .api.push_states_with_delay import DomikaAPIPushStatesWithDelay
 from .api.push_resubscribe import DomikaAPIPushResubscribe
-from .const import DOMAIN, MAIN_LOGGER_NAME, PUSH_INTERVAL
+from .const import DOMAIN, LOGGER, PUSH_INTERVAL
 from .critical_sensor import router as critical_sensor_router
 from .dashboard import router as dashboard_router
 from .database.manage import migrate
@@ -39,7 +39,6 @@ from .subscription.models import Subscription
 # isort: on
 
 CONFIG_SCHEMA = config_validation.empty_config_schema(DOMAIN)
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
 
 
 async def async_setup_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
@@ -121,7 +120,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     # logger:
     #   default: info
     #   logs:
-    #       domika: debug
+    #       custom_components.domika: debug
 
     LOGGER.debug("Async setup")
 

@@ -23,9 +23,8 @@ from homeassistant.helpers import (
 from .models import DomikaEntitiesList, DomikaEntityInfo
 
 import logging
-from ..const import MAIN_LOGGER_NAME
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 def _related(hass: HomeAssistant, root_entity_id: str) -> set[str]:

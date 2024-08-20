@@ -17,13 +17,12 @@ from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import async_response, websocket_command
 from homeassistant.core import HomeAssistant
 
-from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..device import service as device_service
 from .models import DomikaDashboardCreate, DomikaDashboardRead
 from .service import create_or_update, get
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 async def _update_dashboards(

@@ -9,7 +9,7 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "domika"
-MAIN_LOGGER_NAME = DOMAIN
+# MAIN_LOGGER_NAME = DOMAIN
 
 
 if os.getenv("DOMIKA_DEBUG") == "1":

@@ -16,11 +16,10 @@ from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import websocket_command, async_response
 from homeassistant.core import HomeAssistant, callback
 
-from ..const import MAIN_LOGGER_NAME
 from .service import get, get_single
 from ..utils import flatten_json
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 @websocket_command(

@@ -16,11 +16,11 @@ from homeassistant.const import ATTR_DEVICE_CLASS, STATE_ON
 from homeassistant.core import HomeAssistant
 
 from ..const import DOMAIN, CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES, CRITICAL_NOTIFICATION_DEVICE_CLASSES, SENSORS_DOMAIN, \
-    WARNING_NOTIFICATION_DEVICE_CLASSES, MAIN_LOGGER_NAME
+    WARNING_NOTIFICATION_DEVICE_CLASSES
 from .enums import NotificationType
 from .models import DomikaNotificationSensor, DomikaNotificationSensorsRead
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 NOTIFICATION_TYPE_TO_CLASSES = {
     NotificationType.CRITICAL: CRITICAL_NOTIFICATION_DEVICE_CLASSES,

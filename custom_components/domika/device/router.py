@@ -23,7 +23,6 @@ from homeassistant.components.websocket_api.decorators import (
 from homeassistant.core import HomeAssistant
 
 from .. import errors, push_server_errors
-from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from .flow import (
     create_push_session,
@@ -33,7 +32,7 @@ from .flow import (
 )
 from .service import get, delete
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 @websocket_command(

@@ -18,12 +18,11 @@ from aiohttp import web
 from homeassistant.components.api import APIDomainServicesView
 from homeassistant.helpers.json import json_bytes
 
-from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..ha_entity import service as ha_entity_service
 from ..push_data import service as push_data_service
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 class DomikaAPIDomainServicesView(APIDomainServicesView):

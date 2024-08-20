@@ -75,7 +75,7 @@ class OptionsFlowHandler(OptionsFlow):
                     ): bool,
                     vol.Optional(
                         schema="critical_included_entity_ids",
-                        default=self.config_entry.options.get("critical_included_entity_ids")
+                        default=self.config_entry.options.get("critical_included_entity_ids") or []
                     ): entity_selector,
                 }
             ),

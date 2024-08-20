@@ -21,11 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from homeassistant.components.cloud.const import DOMAIN as CLOUD_DOMAIN
 
 from .. import errors, push_server_errors, statuses
-from ..const import MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
+from ..const import PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 from .service import create, get, update, delete, remove_all_with_push_token_hash, get_all_with_push_token_hash
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 async def get_hass_network_properties(hass: HomeAssistant) -> dict:

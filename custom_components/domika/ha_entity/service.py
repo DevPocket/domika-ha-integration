@@ -15,12 +15,11 @@ from typing import Sequence
 from homeassistant.core import async_get_hass
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..const import MAIN_LOGGER_NAME
 from ..subscription import service as subscription_service
 from ..utils import flatten_json
 from .models import DomikaHaEntity
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 async def get(

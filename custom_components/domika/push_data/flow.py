@@ -19,7 +19,7 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import push_server_errors, statuses
-from ..const import DOMAIN, MAIN_LOGGER_NAME, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
+from ..const import DOMAIN, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from ..critical_sensor import service as notifications_sensor_service
 from ..critical_sensor.enums import NotificationType
 from ..database.core import AsyncSessionFactory
@@ -30,7 +30,7 @@ from ..utils import flatten_json
 from .models import PushData, DomikaEventCreate
 from .service import create, decrease_delay_all, delete_by_app_session_id, get_delay_by_entity_id
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 DOMIKA_CRITICAL_SENSOR_CHANGED = 'domika_critical_sensors_changed'
 

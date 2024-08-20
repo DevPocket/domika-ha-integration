@@ -39,6 +39,6 @@ USER_ID3 = "user3"
 TRANSACTION_ID1 = "test_transaction_1"
 TRANSACTION_ID2 = "test_transaction_2"
 TRANSACTION_ID3 = "test_transaction_3"
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 LOGGER.addHandler(logging.StreamHandler())

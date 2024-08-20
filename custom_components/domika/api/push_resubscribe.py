@@ -18,13 +18,12 @@ import sqlalchemy
 from aiohttp import web
 from homeassistant.helpers.http import HomeAssistantView
 
-from ..const import MAIN_LOGGER_NAME
 from ..database.core import AsyncSessionFactory
 from ..ha_entity import service as ha_entity_service
 from ..push_data import service as push_data_service
 from ..subscription.flow import resubscribe_push
 
-LOGGER = logging.getLogger(MAIN_LOGGER_NAME)
+LOGGER = logging.getLogger(__name__)
 
 
 class DomikaAPIPushResubscribe(HomeAssistantView):

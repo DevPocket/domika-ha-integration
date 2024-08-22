@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class DomikaAPIPushResubscribe(HomeAssistantView):
-    """Push state with delay endpoint."""
+    """Update subscriptions, set need_push=1 for the given attributes of given entities."""
 
     url = '/domika/push_resubscribe'
     name = 'domika:push-resubscribe'

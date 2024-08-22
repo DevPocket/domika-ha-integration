@@ -135,11 +135,24 @@ def _related_area(hass: HomeAssistant, entity_id: str) -> str:
     return ""
 
 
-def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo:
+def _related_integrations(hass: HomeAssistant, entity_id: str) -> set:
+    searcher = Searcher(hass, hass_entity.entity_sources(hass))
+    related = searcher.async_search(ItemType.ENTITY, entity_id)
+    if related and "integration" in related:
+        return related["integration"]
+
+    return set()
+
+
+def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo | None:
     result = DomikaEntityInfo({})
     state = hass.states.get(entity_id)
     if not state:
-        return result
+        return None
+
+    integrations =_related_integrations(hass, entity_id)
+    if "mobile_app" in integrations:
+        return None
 
     result.info["name"] = state.attributes.get(ATTR_FRIENDLY_NAME) or state.name
     area = _related_area(hass, entity_id)
@@ -175,6 +188,8 @@ def get(hass: HomeAssistant, domains: list) -> DomikaEntitiesList:
     entity_ids = hass.states.async_entity_ids(domains)
     result = DomikaEntitiesList({})
     for entity_id in entity_ids:
-        result.entities[entity_id] = get_single(hass, entity_id).info
+        single = get_single(hass, entity_id)
+        if single:
+            result.entities[entity_id] = single.info
     return result
 

@@ -22,6 +22,7 @@ async def get(
     app_session_id: uuid.UUID,
     *,
     need_push: bool = True,
+    entity_id: str = None
 ) -> Sequence[Subscription]:
     """
     Get all subscriptions by application sesison id.
@@ -32,6 +33,8 @@ async def get(
         Subscription.app_session_id == app_session_id,
         Subscription.need_push == need_push,
     )
+    if entity_id:
+        stmt.where(Subscription.entity_id == entity_id)
     stmt = stmt.order_by(Subscription.entity_id).order_by(Subscription.attribute)
     return (await db_session.scalars(stmt)).all()
 

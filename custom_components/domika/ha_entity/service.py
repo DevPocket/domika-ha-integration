@@ -27,12 +27,13 @@ async def get(
     app_session_id: uuid.UUID,
     *,
     need_push: bool = True,
+    entity_id: str = None,
 ) -> Sequence[DomikaHaEntity]:
     result: list[DomikaHaEntity] = []
 
     entities_attributes: dict[str, list[str]] = {}
 
-    subscriptions = await subscription_service.get(db_session, app_session_id, need_push=need_push)
+    subscriptions = await subscription_service.get(db_session, app_session_id, need_push=need_push, entity_id=entity_id)
 
     # Convolve entities attribute in for of dict:
     # { noqa: ERA001

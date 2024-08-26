@@ -47,7 +47,10 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        await asyncio.sleep(0.5)
+        delay = float(request.headers.get('X-Delay', 0.5))
+        LOGGER.debug('delay: %s', delay)
+
+        await asyncio.sleep(delay)
 
         try:
             async with AsyncSessionFactory() as session:

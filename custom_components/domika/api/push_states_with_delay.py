@@ -41,6 +41,7 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         LOGGER.debug('request_dict: %s', request_dict)
 
         app_session_id = request.headers.get('X-App-Session-Id')
+        LOGGER.debug('app_session_id: %s', app_session_id)
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
@@ -49,8 +50,8 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        delay = int(request_dict.get('delay', 0))
-        LOGGER.debug('app_session_id: %s', app_session_id)
+        delay = float(request_dict.get('delay', 0))
+        LOGGER.debug('delay: %s', delay)
 
         await asyncio.sleep(delay)
 

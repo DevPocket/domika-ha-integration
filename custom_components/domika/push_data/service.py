@@ -203,10 +203,10 @@ async def delete_for_app_session(
     commit: bool = True,
     entity_id: str = None,
 ):
-    """Delete push data records for a certain app_session_id."""
+    """Delete push data records for a certain app_session_id. If entity_id is not null, only for that entity_id."""
     stmt = sqlalchemy.delete(PushData).where(PushData.app_session_id == app_session_id)
     if entity_id:
-        stmt = stmt.where(Subscription.entity_id == entity_id)
+        stmt = stmt.where(PushData.entity_id == entity_id)
     await db_session.execute(stmt)
 
     if commit:

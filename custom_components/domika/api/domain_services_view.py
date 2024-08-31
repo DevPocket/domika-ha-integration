@@ -33,7 +33,7 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
 
     async def post(self, request: web.Request, domain: str, service: str) -> web.Response:
         """Retrieve if API is running."""
-        LOGGER.debug('DomikaAPIDomainServicesView')
+        LOGGER.debug('DomikaAPIDomainServicesView, domain: %s, service: %s', domain, service)
         # Perform control over entities via given request.
         response = await super().post(request, domain, service)
 

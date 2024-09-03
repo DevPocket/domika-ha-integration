@@ -20,7 +20,7 @@ if os.getenv("DOMIKA_DEBUG") == "1":
 else:
     DATABASE_URL = "sqlite+aiosqlite:///Domika.db"
     PUSH_SERVER_URL = "http://159.203.109.27:8000/api/v1"
-    PUSH_INTERVAL = timedelta(days=15)
+    PUSH_INTERVAL = timedelta(minutes=60)
     ALEMBIC_INI_PATH = "custom_components/domika/alembic.ini"
 
 # Seconds

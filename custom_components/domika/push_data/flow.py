@@ -244,6 +244,7 @@ async def _send_push_data(
 
 async def push_registered_events():
     async with AsyncSessionFactory() as session:
+        LOGGER.debug("Push registered events.")
         await decrease_delay_all(session)
 
         # TODO: add check for elapsed time.
@@ -288,9 +289,7 @@ async def push_registered_events():
 
         entity = {}
         for push_data_record in push_data_records:
-            LOGGER.debug(">>> push_data_record=%s, %s", push_data_record[0], push_data_record[1])
             if current_app_session_id != push_data_record[0].app_session_id:
-                LOGGER.debug(">>> is it time to send pushes? found_delay_zero=%s, events_dict=%s, current_push_session_id=%s", found_delay_zero, events_dict, current_push_session_id)
                 if found_delay_zero and events_dict and current_push_session_id:
                     await _send_push_data(
                         session,
@@ -314,8 +313,6 @@ async def push_registered_events():
             }
             found_delay_zero = found_delay_zero or (push_data_record[0].delay == 0)
 
-        LOGGER.debug(">>> is it time to send pushes? found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
-                     found_delay_zero, events_dict, current_push_session_id)
         if found_delay_zero and events_dict and current_push_session_id:
             await _send_push_data(
                 session,
@@ -325,5 +322,4 @@ async def push_registered_events():
             )
             app_sessions_ids_to_delete_list.append(current_app_session_id)
 
-        LOGGER.debug(">>> delete_by_app_session_id: app_sessions_ids_to_delete_list=%s", app_sessions_ids_to_delete_list)
         await delete_by_app_session_id(session, app_sessions_ids_to_delete_list)

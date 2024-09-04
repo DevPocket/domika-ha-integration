@@ -1,6 +1,6 @@
 # vim: set fileencoding=utf-8
 """
-Domika integration.
+Homeassistant event.
 
 (c) DevPocket, 2024
 

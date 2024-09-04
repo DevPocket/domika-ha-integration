@@ -1,16 +1,16 @@
 """Config flow for Domika integration."""
 
-import voluptuous as vol
 from typing import Any
-from homeassistant.core import callback
-from homeassistant.helpers import selector
+
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 
 from .const import DOMAIN
 
-DOMIKA_SCHEMA = vol.Schema({
-})
+DOMIKA_SCHEMA = vol.Schema({})
 
 
 class DomikaConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -37,9 +37,7 @@ class OptionsFlowHandler(OptionsFlow):
         """Initialize options flow."""
         self.config_entry = config_entry
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -48,9 +46,9 @@ class OptionsFlowHandler(OptionsFlow):
             {
                 "entity": {
                     "domain": "binary_sensor",
-                    "multiple": True
-                }
-            }
+                    "multiple": True,
+                },
+            },
         )
 
         return self.async_show_form(
@@ -59,24 +57,24 @@ class OptionsFlowHandler(OptionsFlow):
                 {
                     vol.Optional(
                         schema="smoke_select_all",
-                        default=self.config_entry.options.get("smoke_select_all") or False
+                        default=self.config_entry.options.get("smoke_select_all", False),
                     ): bool,
                     vol.Optional(
                         schema="moisture_select_all",
-                        default=self.config_entry.options.get("moisture_select_all") or False
+                        default=self.config_entry.options.get("moisture_select_all", False),
                     ): bool,
                     vol.Optional(
                         schema="co_select_all",
-                        default=self.config_entry.options.get("co_select_all") or False
+                        default=self.config_entry.options.get("co_select_all", False),
                     ): bool,
                     vol.Optional(
                         schema="gas_select_all",
-                        default=self.config_entry.options.get("gas_select_all") or False
+                        default=self.config_entry.options.get("gas_select_all", False),
                     ): bool,
                     vol.Optional(
                         schema="critical_included_entity_ids",
-                        default=self.config_entry.options.get("critical_included_entity_ids") or []
+                        default=self.config_entry.options.get("critical_included_entity_ids", []),
                     ): entity_selector,
-                }
+                },
             ),
         )

@@ -12,12 +12,12 @@ import logging
 from typing import Any, cast
 
 import voluptuous as vol
+from domika_ha_framework.utils import flatten_json
 from homeassistant.components.websocket_api.connection import ActiveConnection
-from homeassistant.components.websocket_api.decorators import websocket_command, async_response
+from homeassistant.components.websocket_api.decorators import async_response, websocket_command
 from homeassistant.core import HomeAssistant, callback
 
 from .service import get, get_single
-from ..utils import flatten_json
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +47,6 @@ def websocket_domika_entity_list(
     result = entities.to_dict()
 
     connection.send_result(msg_id, result)
-    # LOGGER.debug("entity_list msg_id=%s data=%s", msg_id, result)
     LOGGER.debug("entity_list msg_id=%s", msg_id)
 
 
@@ -73,7 +72,7 @@ def websocket_domika_entity_info(
 
     entity_id = cast(str, msg.get("entity_id"))
     entity = get_single(hass, entity_id)
-    result = entity.to_dict()
+    result = entity.to_dict() if entity else {}
 
     connection.send_result(msg_id, result)
     LOGGER.debug("entity_info msg_id=%s data=%s", msg_id, result)
@@ -104,19 +103,20 @@ async def websocket_domika_entity_state(
     result = {}
     if state:
         time_updated = max(state.last_changed, state.last_updated)
-        result = {
-                    'entity_id': entity_id,
-                    'time_updated': time_updated,
-                    'attributes': flatten_json(
-                        state.as_compressed_state,
-                        exclude={'c', 'lc', 'lu'},
-                    ),
-                },
+        result = (
+            {
+                "entity_id": entity_id,
+                "time_updated": time_updated,
+                "attributes": flatten_json(
+                    state.as_compressed_state,
+                    exclude={"c", "lc", "lu"},
+                ),
+            },
+        )
     else:
         LOGGER.error(
-            'entity_state requesting state of unknown entity: %s',
+            "entity_state requesting state of unknown entity: %s",
             entity_id,
         )
     connection.send_result(msg_id, result)
     LOGGER.debug("entity_state msg_id=%s data=%s", msg_id, result)
-

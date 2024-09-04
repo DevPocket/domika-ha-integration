@@ -49,11 +49,11 @@ CRITICAL_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in CRITICAL_NOTIFICATION_SE
 WARNING_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in WARNING_NOTIFICATION_SENSORS]
 
 CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
-    'smoke_select_all': BinarySensorDeviceClass.SMOKE,
-    'moisture_select_all': BinarySensorDeviceClass.MOISTURE,
-    'co_select_all': BinarySensorDeviceClass.CO,
-    'gas_select_all': BinarySensorDeviceClass.GAS
+    "smoke_select_all": BinarySensorDeviceClass.SMOKE,
+    "moisture_select_all": BinarySensorDeviceClass.MOISTURE,
+    "co_select_all": BinarySensorDeviceClass.CO,
+    "gas_select_all": BinarySensorDeviceClass.GAS,
 }
 
 PUSH_DELAY_DEFAULT = 0
-PUSH_DELAY_FOR_DOMAIN = {'sensor': 4}
+PUSH_DELAY_FOR_DOMAIN = {"sensor": 4}

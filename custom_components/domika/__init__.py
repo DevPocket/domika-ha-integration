@@ -7,19 +7,20 @@ import logging
 from functools import partial
 
 import domika_ha_framework
+from aiohttp import ClientTimeout
 from domika_ha_framework import config
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
 
 from .api.domain_services_view import DomikaAPIDomainServicesView
 from .api.push_resubscribe import DomikaAPIPushResubscribe
 from .api.push_states_with_delay import DomikaAPIPushStatesWithDelay
-from .const import DOMAIN, PUSH_INTERVAL
+from .const import DOMAIN, PUSH_INTERVAL, PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .critical_sensor import router as critical_sensor_router
 from .dashboard import router as dashboard_router
 from .device import router as device_router
@@ -31,23 +32,36 @@ from .tasks_registry import BACKGROUND_TASKS, BackgroundTask
 
 LOGGER = logging.getLogger(__name__)
 
-CONFIG_SCHEMA = config_validation.empty_config_schema(DOMAIN)
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a config entry."""
     LOGGER.debug("Entry loading")
 
-    # Register homeassistant startup callback.
-    async_at_started(hass, _on_homeassistant_started)
-
     if not hass.data.get(DOMAIN):
         hass.data[DOMAIN] = {}
-    hass.data[DOMAIN]["critical_entities"] = entry.options
+    hass.data[DOMAIN]["critical_entities"] = entry.options.get("critical_entities")
 
-    await domika_ha_framework.init(config.Config())
+    try:
+        await domika_ha_framework.init(
+            config.Config(
+                database_url=f"sqlite+aiosqlite:///{hass.config.path()}/Domika.db",
+                push_server_url=PUSH_SERVER_URL,
+                push_server_timeout=ClientTimeout(total=PUSH_SERVER_TIMEOUT),
+            ),
+        )
+        framework_logger = logging.getLogger("domika_ha_framework")
+        for handler in LOGGER.handlers:
+            framework_logger.addHandler(handler)
+    except Exception as e:
+        LOGGER.exception("Can't setup %s enrty. %s", DOMAIN, e)
+        return False
 
     entry.async_on_unload(entry.add_update_listener(config_update_listener))
+
+    # Register homeassistant startup callback.
+    async_at_started(hass, _on_homeassistant_started)
 
     LOGGER.debug("Entry loaded")
     return True
@@ -55,18 +69,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def config_update_listener(hass: HomeAssistant, entry: ConfigEntry):
     """Handle options update."""
-    if not hass.data.get(DOMAIN):
-        hass.data[DOMAIN] = {}
-    hass.data[DOMAIN]["critical_entities"] = entry.options
-
-    # TODO: Uncomment later
-    # await domika_ha_framework.init(config.Config())
+    # Reload entry.
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Close background entries.
     for task in BACKGROUND_TASKS.values():
         task.cancel("Unloading entry")
+
+    # Unsubscribe from events.
+    if cancel_registgrator_cb := hass.data[DOMAIN].get("cancel_registgrator_cb", None):
+        cancel_registgrator_cb()
+        hass.data[DOMAIN]["cancel_registgrator_cb"] = None
 
     await asyncio.sleep(0)
 
@@ -109,7 +125,10 @@ async def _on_homeassistant_started(hass: HomeAssistant):
     BACKGROUND_TASKS[BackgroundTask.EVENT_PUSHER] = event_pusher_task
 
     # Setup Domika event registrator.
-    hass.bus.async_listen(EVENT_STATE_CHANGED, partial(ha_event_flow.register_event, hass))
+    hass.data[DOMAIN]["cancel_registgrator_cb"] = hass.bus.async_listen(
+        EVENT_STATE_CHANGED,
+        partial(ha_event_flow.register_event, hass),
+    )
     LOGGER.debug("Subscribed to EVENT_STATE_CHANGED events")
 
 

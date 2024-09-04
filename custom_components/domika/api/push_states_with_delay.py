@@ -38,10 +38,8 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         LOGGER.debug('DomikaAPIPushStatesWithDelay')
 
         request_dict = await request.json()
-        LOGGER.debug('request_dict: %s', request_dict)
 
         app_session_id = request.headers.get('X-App-Session-Id')
-        LOGGER.debug('app_session_id: %s', app_session_id)
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
@@ -51,12 +49,16 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             )
 
         entity_id = request_dict.get('entity_id')
+        delay = float(request_dict.get('delay', 0))
 
         ignore_need_push = request_dict.get('ignore_need_push')
         need_push = True if not ignore_need_push else False
-        LOGGER.debug('ignore_need_push: %s, need_push: %s', ignore_need_push, need_push)
-
-        delay = float(request_dict.get('delay', 0))
+        LOGGER.debug(
+            'DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s, ignore_need_push: %s',
+            request_dict,
+            app_session_id,
+            ignore_need_push
+        )
 
         await asyncio.sleep(delay)
 

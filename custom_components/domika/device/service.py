@@ -19,7 +19,7 @@ from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 
 
 async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | None:
-    """Get device by application sesison id."""
+    """Get device by application session id."""
     stmt = select(Device).where(Device.app_session_id == app_session_id)
     return await db_session.scalar(stmt)
 

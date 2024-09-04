@@ -100,7 +100,6 @@ async def update_app_session_id(
 
     if app_session_id:
         # Try to find the proper record.
-        LOGGER.debug(">>> app_session_id = %s", app_session_id)
         device = await get(db_session, app_session_id=app_session_id)
 
         if device:

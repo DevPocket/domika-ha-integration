@@ -51,16 +51,18 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             )
 
         entity_id = request_dict.get('entity_id')
-        LOGGER.debug('entity_id: %s', entity_id)
+
+        ignore_need_push = request_dict.get('ignore_need_push')
+        need_push = True if not ignore_need_push else False
+        LOGGER.debug('ignore_need_push: %s, need_push: %s', ignore_need_push, need_push)
 
         delay = float(request_dict.get('delay', 0))
-        LOGGER.debug('delay: %s', delay)
 
         await asyncio.sleep(delay)
 
         try:
             async with AsyncSessionFactory() as session:
-                result = await ha_entity_service.get(session, app_session_id, entity_id=entity_id)
+                result = await ha_entity_service.get(session, app_session_id, need_push=need_push, entity_id=entity_id)
                 await push_data_service.delete_for_app_session(session, app_session_id=app_session_id, entity_id=entity_id)
 
         except sqlalchemy.exc.SQLAlchemyError as e:

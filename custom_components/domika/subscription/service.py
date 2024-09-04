@@ -29,10 +29,9 @@ async def get(
 
     Subscriptions filtered by need_push flag.
     """
-    stmt = sqlalchemy.select(Subscription).where(
-        Subscription.app_session_id == app_session_id,
-        Subscription.need_push == need_push,
-    )
+    stmt = sqlalchemy.select(Subscription).where(Subscription.app_session_id == app_session_id)
+    if need_push:
+        stmt = stmt.where(Subscription.need_push == need_push)
     if entity_id:
         stmt = stmt.where(Subscription.entity_id == entity_id)
     stmt = stmt.order_by(Subscription.entity_id).order_by(Subscription.attribute)

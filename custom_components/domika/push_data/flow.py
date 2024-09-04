@@ -105,14 +105,14 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
             event.context,
             event.time_fired.timestamp(),  # TODO: convert to int?
         )
-        LOGGER.debug(
-            '### %s, %s, %s, %s, %s',
-            DOMIKA_CRITICAL_SENSOR_CHANGED,
-            sensors_data.to_dict(),
-            event.origin,
-            event.context.id,
-            event.time_fired,
-        )
+        # LOGGER.debug(
+        #     'register_event %s, %s, %s, %s, %s',
+        #     DOMIKA_CRITICAL_SENSOR_CHANGED,
+        #     sensors_data.to_dict(),
+        #     event.origin,
+        #     event.context.id,
+        #     event.time_fired,
+        # )
 
     # Store events into db.
     event_id = uuid.uuid4()

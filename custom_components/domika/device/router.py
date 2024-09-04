@@ -96,7 +96,7 @@ async def _check_push_token(
             }
             LOGGER.info('Push token hash "%s" check. Need validation', push_token_hash)
 
-    LOGGER.debug('### domika_%s, %s, %s', app_session_id, push_token_hash, event_result)
+    LOGGER.debug('_check_push_token domika_%s, %s, %s', app_session_id, push_token_hash, event_result)
     hass.bus.async_fire(f'domika_{app_session_id}', event_result)
 
 

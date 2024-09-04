@@ -55,14 +55,14 @@ def _fire_events_to_app_session_ids(
             event.context,
             event.time_fired.timestamp(),
         )
-        LOGGER.debug(
-            '### domika_%s, %s, %s, %s, %s',
-            app_session_id,
-            dict_attributes,
-            event.origin,
-            event.context.id,
-            event.time_fired,
-        )
+        # LOGGER.debug(
+        #     '_fire_events_to_app_session_ids domika_%s, %s, %s, %s, %s',
+        #     app_session_id,
+        #     dict_attributes,
+        #     event.origin,
+        #     event.context.id,
+        #     event.time_fired,
+        # )
 
 
 async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData]):

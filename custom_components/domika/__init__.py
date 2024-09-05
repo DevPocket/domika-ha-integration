@@ -39,10 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a config entry."""
     LOGGER.debug("Entry loading")
 
-    if not hass.data.get(DOMAIN):
-        hass.data[DOMAIN] = {}
-    hass.data[DOMAIN]["critical_entities"] = entry.options.get("critical_entities")
-
+    # Init framework library.
     try:
         await domika_ha_framework.init(
             config.Config(
@@ -58,97 +55,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         LOGGER.exception("Can't setup %s enrty. %s", DOMAIN, e)
         return False
 
-    entry.async_on_unload(entry.add_update_listener(config_update_listener))
+    # Update domain's critical_entities from options.
+    if not hass.data.get(DOMAIN):
+        hass.data[DOMAIN] = {}
+    hass.data[DOMAIN]["critical_entities"] = entry.options.get("critical_entities")
 
-    # Register homeassistant startup callback.
-    async_at_started(hass, _on_homeassistant_started)
-
-    LOGGER.debug("Entry loaded")
-    return True
-
-
-async def config_update_listener(hass: HomeAssistant, entry: ConfigEntry):
-    """Handle options update."""
-    # Reload entry.
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
-async def async_unload_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    # Close background entries.
-    for task in BACKGROUND_TASKS.values():
-        task.cancel("Unloading entry")
-
-    # Unsubscribe from events.
-    if cancel_registgrator_cb := hass.data[DOMAIN].get("cancel_registgrator_cb", None):
-        cancel_registgrator_cb()
-        hass.data[DOMAIN]["cancel_registgrator_cb"] = None
-
-    await asyncio.sleep(0)
-
-    await domika_ha_framework.dispose()
-
-    LOGGER.debug("Entry unloaded")
-    return True
-
-
-async def async_remove_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> None:
-    """Handle removal of a local storage."""
-    # TODO: remove database file here.
-    LOGGER.debug("Entry removed")
-
-
-async def async_migrate_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> bool:
-    """Migrate an old config entry."""
-    LOGGER.debug("Entry migration finished")
-    return True
-
-
-async def _event_pusher(hass: HomeAssistant):
-    LOGGER.info("Event pusher started")
-    try:
-        while True:
-            await asyncio.sleep(PUSH_INTERVAL.seconds)
-            try:
-                await ha_event_flow.push_registered_events(hass)
-            except Exception as e:
-                LOGGER.exception("Event pusher error. %s", e)
-    except asyncio.CancelledError as e:
-        LOGGER.info("Event pusher stopped. %s", e)
-        raise
-
-
-async def _on_homeassistant_started(hass: HomeAssistant):
-    """Start listen events and push data after homeassistant fully started."""
-    # Setup event pusher.
-    event_pusher_task = hass.async_create_background_task(_event_pusher(hass), "event_pusher")
-    BACKGROUND_TASKS[BackgroundTask.EVENT_PUSHER] = event_pusher_task
-
-    # Setup Domika event registrator.
-    hass.data[DOMAIN]["cancel_registgrator_cb"] = hass.bus.async_listen(
-        EVENT_STATE_CHANGED,
-        partial(ha_event_flow.register_event, hass),
-    )
-    LOGGER.debug("Subscribed to EVENT_STATE_CHANGED events")
-
-
-async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
-    """Set up component."""
-    # LOGGER.setLevel(logging.DEBUG)
-    # To config proper logs level put the following into your configuration.yaml.
-    # logger:
-    #   default: info
-    #   logs:
-    #       custom_components.domika: debug
-
-    LOGGER.debug("Async setup")
-
-    # Setup Domika api views.
-    hass.http.register_view(DomikaAPIDomainServicesView)
-    hass.http.register_view(DomikaAPIPushStatesWithDelay)
-    hass.http.register_view(DomikaAPIPushResubscribe)
-
-    # Setup Domika WebSocket commands.
+    # Register Domika WebSocket commands.
     websocket_api.async_register_command(hass, device_router.websocket_domika_update_app_session)
     websocket_api.async_register_command(hass, device_router.websocket_domika_remove_app_session)
     websocket_api.async_register_command(hass, device_router.websocket_domika_update_push_token)
@@ -171,4 +83,114 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     websocket_api.async_register_command(hass, entity_router.websocket_domika_entity_info)
     websocket_api.async_register_command(hass, entity_router.websocket_domika_entity_state)
 
+    # Register config update callback.
+    entry.async_on_unload(entry.add_update_listener(config_update_listener))
+
+    # Register homeassistant startup callback.
+    async_at_started(hass, _on_homeassistant_started)
+
+    LOGGER.debug("Entry loaded")
+    return True
+
+
+async def config_update_listener(hass: HomeAssistant, entry: ConfigEntry):
+    """Handle options update."""
+    # Reload entry.
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_unload_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    LOGGER.debug("Entry unloading")
+    # Unregister Domika WebSocket commands.
+    websocket_api_handlers: dict = hass.data.get(websocket_api.DOMAIN, {})
+    websocket_api_handlers.pop("domika/update_app_session")
+    websocket_api_handlers.pop("domika/remove_app_session")
+    websocket_api_handlers.pop("domika/update_push_token")
+    websocket_api_handlers.pop("domika/update_push_session")
+    websocket_api_handlers.pop("domika/verify_push_session")
+    websocket_api_handlers.pop("domika/remove_push_session")
+    websocket_api_handlers.pop("domika/resubscribe")
+    websocket_api_handlers.pop("domika/confirm_event")
+    websocket_api_handlers.pop("domika/critical_sensors")
+    websocket_api_handlers.pop("domika/update_dashboards")
+    websocket_api_handlers.pop("domika/get_dashboards")
+    websocket_api_handlers.pop("domika/get_dashboards_hash")
+    websocket_api_handlers.pop("domika/entity_list")
+    websocket_api_handlers.pop("domika/entity_info")
+    websocket_api_handlers.pop("domika/entity_state")
+
+    # Close background entries.
+    for task in BACKGROUND_TASKS.values():
+        task.cancel("Unloading entry")
+
+    # Unsubscribe from events.
+    if cancel_registgrator_cb := hass.data[DOMAIN].get("cancel_registgrator_cb", None):
+        cancel_registgrator_cb()
+        hass.data[DOMAIN]["cancel_registgrator_cb"] = None
+
+    await asyncio.sleep(0)
+
+    # Dispose framework library.
+    await domika_ha_framework.dispose()
+
+    LOGGER.debug("Entry unloaded")
+    return True
+
+
+async def async_remove_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> None:
+    """Handle removal of a local storage."""
+    # TODO: remove database file here.
+    LOGGER.debug("Entry removed")
+
+
+async def async_migrate_entry(_hass: HomeAssistant, _entry: ConfigEntry) -> bool:
+    """Migrate an old config entry."""
+    return True
+
+
+async def _event_pusher(hass: HomeAssistant):
+    LOGGER.debug("Event pusher started")
+    try:
+        while True:
+            await asyncio.sleep(PUSH_INTERVAL.seconds)
+            try:
+                await ha_event_flow.push_registered_events(hass)
+            except Exception as e:
+                LOGGER.exception("Event pusher error. %s", e)
+    except asyncio.CancelledError as e:
+        LOGGER.debug("Event pusher stopped. %s", e)
+        raise
+
+
+async def _on_homeassistant_started(hass: HomeAssistant):
+    """Start listen events and push data after homeassistant fully started."""
+    # Setup event pusher.
+    event_pusher_task = hass.async_create_background_task(_event_pusher(hass), "event_pusher")
+    BACKGROUND_TASKS[BackgroundTask.EVENT_PUSHER] = event_pusher_task
+
+    # Setup Domika event registrator.
+    hass.data[DOMAIN]["cancel_registgrator_cb"] = hass.bus.async_listen(
+        EVENT_STATE_CHANGED,
+        partial(ha_event_flow.register_event, hass),
+    )
+    LOGGER.debug("Subscribed to EVENT_STATE_CHANGED events")
+
+
+async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
+    """Set up component."""
+    # To config proper logs level put the following into your configuration.yaml.
+    # logger:
+    #   default: info
+    #   logs:
+    #       custom_components.domika: debug
+
+    LOGGER.debug("Component loading")
+
+    # Setup Domika api views.
+    hass.http.register_view(DomikaAPIDomainServicesView)
+    hass.http.register_view(DomikaAPIPushStatesWithDelay)
+    hass.http.register_view(DomikaAPIPushResubscribe)
+
+    LOGGER.debug("Component loaded")
     return True

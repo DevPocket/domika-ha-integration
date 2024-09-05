@@ -35,15 +35,15 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
 
     async def post(self, request: web.Request, domain: str, service: str) -> web.Response:
         """Retrieve if API is running."""
-        # Perform control over entities via given request.
-        response = await super().post(request, domain, service)
-
         # Check that integration still loaded.
         hass = async_get_hass()
         if not hass.data.get(DOMAIN):
             return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
         LOGGER.debug("DomikaAPIDomainServicesView, domain: %s, service: %s", domain, service)
+
+        # Perform control over entities via given request.
+        response = await super().post(request, domain, service)
 
         app_session_id = request.headers.get("X-App-Session-Id")
         LOGGER.debug("app_session_id: %s", app_session_id)

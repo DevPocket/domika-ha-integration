@@ -17,7 +17,10 @@ import domika_ha_framework.database.core as database_core
 import domika_ha_framework.subscription.flow as subscription_flow
 from aiohttp import web
 from domika_ha_framework.errors import DomikaFrameworkBaseError
+from homeassistant.core import async_get_hass
 from homeassistant.helpers.http import HomeAssistantView
+
+from ..const import DOMAIN
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +54,11 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
 
     async def post(self, request: web.Request) -> web.Response:
         """Post method."""
+        # Check that integration still loaded.
+        hass = async_get_hass()
+        if not hass.data.get(DOMAIN):
+            return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
+
         LOGGER.debug("DomikaAPIPushResubscribe")
 
         request_dict = await request.json()

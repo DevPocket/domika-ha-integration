@@ -18,8 +18,10 @@ import domika_ha_framework.push_data.service as push_data_service
 from aiohttp import web
 from domika_ha_framework.errors import DomikaFrameworkBaseError
 from homeassistant.components.api import APIDomainServicesView
+from homeassistant.core import async_get_hass
 from homeassistant.helpers.json import json_bytes
 
+from ..const import DOMAIN
 from ..ha_entity import service as ha_entity_service
 
 LOGGER = logging.getLogger(__name__)
@@ -33,9 +35,15 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
 
     async def post(self, request: web.Request, domain: str, service: str) -> web.Response:
         """Retrieve if API is running."""
-        LOGGER.debug("DomikaAPIDomainServicesView, domain: %s, service: %s", domain, service)
         # Perform control over entities via given request.
         response = await super().post(request, domain, service)
+
+        # Check that integration still loaded.
+        hass = async_get_hass()
+        if not hass.data.get(DOMAIN):
+            return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
+
+        LOGGER.debug("DomikaAPIDomainServicesView, domain: %s, service: %s", domain, service)
 
         app_session_id = request.headers.get("X-App-Session-Id")
         LOGGER.debug("app_session_id: %s", app_session_id)

@@ -134,6 +134,9 @@ async def async_unload_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
     # Dispose framework library.
     await domika_ha_framework.dispose()
 
+    # Clear hass data.
+    hass.data.pop(DOMAIN)
+
     LOGGER.debug("Entry unloaded")
     return True
 

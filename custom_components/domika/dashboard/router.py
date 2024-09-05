@@ -131,6 +131,7 @@ async def websocket_domika_get_dashboards(
         connection.user.id,
     )
 
+    dashboards = None
     try:
         async with database_core.get_session() as session:
             dashboards = await dashboard_service.get(session, connection.user.id)
@@ -180,6 +181,7 @@ async def websocket_domika_get_dashboards_hash(
         connection.user.id,
     )
 
+    dashboards = None
     try:
         async with database_core.get_session() as session:
             dashboards = await dashboard_service.get(session, connection.user.id)

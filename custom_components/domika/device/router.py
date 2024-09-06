@@ -11,7 +11,7 @@ Author(s): Artem Bezborodko
 import contextlib
 import logging
 import uuid
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.device.flow as device_flow
@@ -20,7 +20,6 @@ import voluptuous as vol
 from domika_ha_framework import errors, push_server_errors
 from domika_ha_framework.errors import DomikaFrameworkBaseError
 from homeassistant.components import network
-from homeassistant.components.cloud.const import DOMAIN as CLOUD_DOMAIN
 from homeassistant.components.hassio import is_hassio
 from homeassistant.components.hassio.data import get_host_info
 from homeassistant.components.websocket_api.connection import ActiveConnection
@@ -34,7 +33,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 LOGGER = logging.getLogger(__name__)
 
 
-async def get_hass_network_properties(hass: HomeAssistant) -> dict:
+async def _get_hass_network_properties(hass: HomeAssistant) -> dict:
     instance_name = hass.config.location_name
     cloud_url: str | None = None
     certificate_fingerprint: str | None = None
@@ -50,39 +49,33 @@ async def get_hass_network_properties(hass: HomeAssistant) -> dict:
         local_url = f"http://{host_info['hostname']}.local:{port}"
 
     if "cloud" in hass.config.components:
-        from homeassistant.components.cloud import (
-            CloudNotAvailable,
-            async_remote_ui_url,
-        )
+        from hass_nabucasa import Cloud
+        from homeassistant.components.cloud import CloudNotAvailable, async_remote_ui_url
+        from homeassistant.components.cloud.const import DOMAIN as CLOUD_DOMAIN
 
         try:
             cloud_url = async_remote_ui_url(hass)
             if hass.data[CLOUD_DOMAIN]:
-                cloud = hass.data[CLOUD_DOMAIN]
-
-                certificate_fingerprint = cloud.remote.certificate.fingerprint
+                cloud: Cloud = hass.data[CLOUD_DOMAIN]
+                if cloud and cloud.remote.certificate:
+                    certificate_fingerprint = cloud.remote.certificate.fingerprint
         except CloudNotAvailable:
             cloud_url = None
 
     announce_addresses = await network.async_get_announce_addresses(hass)
-    local_ip_port = f"http://{announce_addresses[0]}:{port}"
+    local_ip_port = f"http://{announce_addresses[0]}:{port}" if announce_addresses else None
 
     result = {}
-    if instance_name:
-        result["instance_name"] = instance_name
-    if local_ip_port:
-        result["local_ip_port"] = local_ip_port
-    if local_url:
-        result["local_url"] = local_url
-    if external_url:
-        result["external_url"] = external_url
-    if internal_url:
-        result["internal_url"] = internal_url
-    if cloud_url:
-        result["cloud_url"] = cloud_url
-    if certificate_fingerprint:
-        result["certificate_fingerprint"] = certificate_fingerprint
-    return result
+    result["instance_name"] = instance_name
+    result["local_ip_port"] = local_ip_port
+    result["local_url"] = local_url
+    result["external_url"] = external_url
+    result["internal_url"] = internal_url
+    result["cloud_url"] = cloud_url
+    result["certificate_fingerprint"] = certificate_fingerprint
+
+    # Return without none values.
+    return {k: v for k, v in result.items() if v is not None}
 
 
 @websocket_command(
@@ -99,17 +92,16 @@ async def websocket_domika_update_app_session(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika update app session request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "update_app_session", msg_id is missing.')
         return
 
     LOGGER.debug('Got websocket message "update_app_session", data: %s', msg)
 
-    push_token_hash = cast(str, msg.get("push_token_hash") or "")
-    app_session_id: uuid.UUID | None = None
-    cm = contextlib.suppress(TypeError)
-    with cm:
+    push_token_hash = cast(str, msg.get("push_token_hash"))
+    app_session_id: Optional[uuid.UUID] = None
+    with contextlib.suppress(TypeError):
         app_session_id = uuid.UUID(msg.get("app_session_id"))
 
     try:
@@ -123,7 +115,7 @@ async def websocket_domika_update_app_session(
             LOGGER.info('Successfully updated app session id "%s".', app_session_id)
 
         result = {"app_session_id": app_session_id, "old_app_session_ids": old_app_session_ids}
-        result.update(await get_hass_network_properties(hass))
+        result.update(await _get_hass_network_properties(hass))
     except DomikaFrameworkBaseError as e:
         LOGGER.error("Can't updated app session id. Framework error. %s", e)
         result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}
@@ -179,7 +171,6 @@ async def _check_push_token(
             e,
         )
 
-    LOGGER.debug("### domika_%s, %s, %s", app_session_id, push_token_hash, event_result)
     hass.bus.async_fire(f"domika_{app_session_id}", event_result)
 
 
@@ -197,8 +188,8 @@ async def websocket_domika_update_push_token(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika update push token request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "update_push_token", msg_id is missing.')
         return
 
@@ -261,8 +252,8 @@ async def websocket_domika_remove_push_session(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika remove push session request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "remove_push_session", msg_id is missing.')
         return
 
@@ -360,8 +351,8 @@ async def websocket_domika_update_push_session(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika update push session request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "update_push_session", msg_id is missing.')
         return
 
@@ -441,8 +432,8 @@ async def websocket_domika_remove_app_session(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika remove app session request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "remove_app_session", msg_id is missing.')
         return
 
@@ -543,8 +534,8 @@ async def websocket_domika_verify_push_session(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika verify push session request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "verify_push_session", msg_id is missing.')
         return
 

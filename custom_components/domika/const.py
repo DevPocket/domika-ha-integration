@@ -56,4 +56,5 @@ CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
 }
 
 PUSH_DELAY_DEFAULT = 2
+# this is the number of intervals PUSH_INTERVAL, that define the PUSH_INTERVAL for the domain
 PUSH_DELAY_FOR_DOMAIN = {'sensor': 2}

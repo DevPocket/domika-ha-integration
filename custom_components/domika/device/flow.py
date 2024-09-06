@@ -25,7 +25,21 @@ from ..const import PUSH_SERVER_TIMEOUT, PUSH_SERVER_URL
 from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 from .service import create, get, update, delete, remove_all_with_push_token_hash, get_all_with_push_token_hash
 
+from homeassistant.const import __version__ as hass_version
+from homeassistant.loader import async_get_integration
+
 LOGGER = logging.getLogger(__name__)
+
+
+async def get_hass_domika_properties(hass: HomeAssistant) -> dict:
+    result = dict()
+    result["hass_version"] = hass_version
+
+    domika = await async_get_integration(hass, "domika")
+    if domika:
+        result["domika_version"] = domika.version
+
+    return result
 
 
 async def get_hass_network_properties(hass: HomeAssistant) -> dict:

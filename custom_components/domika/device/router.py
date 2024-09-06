@@ -28,7 +28,9 @@ from .flow import (
     create_push_session,
     remove_push_session,
     update_app_session_id,
-    verify_push_session, get_hass_network_properties,
+    verify_push_session,
+    get_hass_network_properties,
+    get_hass_domika_properties,
 )
 from .service import get, delete
 
@@ -71,6 +73,7 @@ async def websocket_domika_update_app_session(
         'old_app_session_ids': old_app_session_ids
     }
     result.update(await get_hass_network_properties(hass))
+    result.update(await get_hass_domika_properties(hass))
 
     connection.send_result(msg_id, result)
     LOGGER.debug('update_app_session msg_id=%s data=%s', msg_id, result)

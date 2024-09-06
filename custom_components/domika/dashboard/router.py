@@ -19,7 +19,10 @@ from domika_ha_framework.dashboard.models import DomikaDashboardCreate, DomikaDa
 from domika_ha_framework.errors import DomikaFrameworkBaseError
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import async_response, websocket_command
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+
+from ..const import DOMAIN
 
 LOGGER = logging.getLogger(__name__)
 
@@ -96,7 +99,15 @@ async def websocket_domika_update_dashboards(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("update_dashboards msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    domain_data: dict[str, Any] = hass.data.get(DOMAIN, {})
+    entry: Optional[ConfigEntry] = domain_data.get("entry")
+
+    if not entry:
+        LOGGER.debug("update_dashboards Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _update_dashboards(
             hass,
             cast(str, msg.get("dashboards")),

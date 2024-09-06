@@ -59,6 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data.get(DOMAIN):
         hass.data[DOMAIN] = {}
     hass.data[DOMAIN]["critical_entities"] = entry.options.get("critical_entities")
+    hass.data[DOMAIN]["entry"] = entry
 
     # Register Domika WebSocket commands.
     websocket_api.async_register_command(hass, device_router.websocket_domika_update_app_session)

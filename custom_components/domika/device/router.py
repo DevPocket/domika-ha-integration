@@ -27,8 +27,11 @@ from homeassistant.components.websocket_api.decorators import (
     async_response,
     websocket_command,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from ..const import DOMAIN
 
 LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +79,11 @@ async def _get_hass_network_properties(hass: HomeAssistant) -> dict:
 
     # Return without none values.
     return {k: v for k, v in result.items() if v is not None}
+
+
+def _get_entry(hass: HomeAssistant) -> Optional[ConfigEntry]:
+    domain_data: dict[str, Any] = hass.data.get(DOMAIN, {})
+    return domain_data.get("entry")
 
 
 @websocket_command(
@@ -199,7 +207,13 @@ async def websocket_domika_update_push_token(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("update_push_token msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    entry = _get_entry(hass)
+    if not entry:
+        LOGGER.debug("update_push_token Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _check_push_token(
             hass,
             cast(uuid.UUID, msg.get("app_session_id")),
@@ -263,7 +277,13 @@ async def websocket_domika_remove_push_session(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("remove_push_session msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    entry = _get_entry(hass)
+    if not entry:
+        LOGGER.debug("remove_push_session Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _remove_push_session(hass, cast(uuid.UUID, msg.get("app_session_id"))),
         "remove_push_session",
     )
@@ -362,7 +382,13 @@ async def websocket_domika_update_push_session(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("update_push_session msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    entry = _get_entry(hass)
+    if not entry:
+        LOGGER.debug("update_push_session Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _create_push_session(
             hass,
             cast(str, msg.get("original_transaction_id")),
@@ -443,7 +469,13 @@ async def websocket_domika_remove_app_session(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("remove_app_session msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    entry = _get_entry(hass)
+    if not entry:
+        LOGGER.debug("remove_app_session Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _remove_app_session(hass, cast(uuid.UUID, msg.get("app_session_id"))),
         "remove_app_session",
     )
@@ -545,7 +577,13 @@ async def websocket_domika_verify_push_session(
     connection.send_result(msg_id, {"result": "accepted"})
     LOGGER.debug("verify_push_session msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
-    hass.async_create_task(
+    entry = _get_entry(hass)
+    if not entry:
+        LOGGER.debug("verify_push_session Error. Entry not found.")
+        return
+
+    entry.async_create_task(
+        hass,
         _verify_push_session(
             hass,
             cast(uuid.UUID, msg.get("app_session_id")),

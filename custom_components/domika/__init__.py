@@ -182,12 +182,6 @@ async def _on_homeassistant_started(hass: HomeAssistant):
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     """Set up component."""
-    # To config proper logs level put the following into your configuration.yaml.
-    # logger:
-    #   default: info
-    #   logs:
-    #       custom_components.domika: debug
-
     LOGGER.debug("Component loading")
 
     # Setup Domika api views.

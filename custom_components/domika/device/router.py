@@ -21,7 +21,7 @@ from domika_ha_framework import errors, push_server_errors
 from domika_ha_framework.errors import DomikaFrameworkBaseError
 from homeassistant.components import network
 from homeassistant.components.hassio import is_hassio
-from homeassistant.components.hassio.data import get_host_info
+from homeassistant.components.hassio.coordinator import get_host_info
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import (
     async_response,

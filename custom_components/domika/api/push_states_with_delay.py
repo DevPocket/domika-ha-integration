@@ -12,6 +12,7 @@ import asyncio
 import logging
 import uuid
 from http import HTTPStatus
+from typing import Any
 
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.push_data.service as push_data_service
@@ -42,13 +43,9 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         if not hass.data.get(DOMAIN):
             return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
-        LOGGER.debug("DomikaAPIPushStatesWithDelay")
-
-        request_dict = await request.json()
-        LOGGER.debug("request_dict: %s", request_dict)
+        request_dict: dict[str, Any] = await request.json()
 
         app_session_id = request.headers.get("X-App-Session-Id")
-        LOGGER.debug("app_session_id: %s", app_session_id)
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
@@ -58,16 +55,30 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             )
 
         entity_id = request_dict.get("entity_id")
-        LOGGER.debug("entity_id: %s", entity_id)
-
         delay = float(request_dict.get("delay", 0))
+        ignore_need_push = request_dict.get("ignore_need_push", False)
+        need_push = None if ignore_need_push else True
+
+        LOGGER.debug(
+            "DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s, "
+            "ignore_need_push: %s",
+            request_dict,
+            app_session_id,
+            ignore_need_push,
+        )
+
         LOGGER.debug("delay: %s", delay)
 
         await asyncio.sleep(delay)
 
         try:
             async with database_core.get_session() as session:
-                result = await ha_entity_service.get(session, app_session_id, entity_id=entity_id)
+                result = await ha_entity_service.get(
+                    session,
+                    app_session_id,
+                    need_push=need_push,
+                    entity_id=entity_id,
+                )
                 await push_data_service.delete_for_app_session(
                     session,
                     app_session_id=app_session_id,

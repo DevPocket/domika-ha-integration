@@ -26,7 +26,7 @@ async def get(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     *,
-    need_push: bool = True,
+    need_push: Optional[bool] = True,
     entity_id: Optional[str] = None,
 ) -> Sequence[DomikaHaEntity]:
     result: list[DomikaHaEntity] = []

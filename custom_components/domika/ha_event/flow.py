@@ -31,6 +31,7 @@ DOMIKA_CRITICAL_SENSOR_CHANGED = "domika_critical_sensors_changed"
 
 
 async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData]):
+    """Register new incoming HA event."""
     event_data: EventStateChangedData = event.data
     if not event_data:
         return
@@ -115,11 +116,9 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
 
 
 async def push_registered_events(hass: HomeAssistant):
+    """Push registered events to the push server."""
     async with database_core.get_session() as session:
-        await push_data_flow.push_registered_events(
-            session,
-            async_get_clientsession(hass),
-        )
+        await push_data_flow.push_registered_events(session, async_get_clientsession(hass))
 
 
 def _get_changed_attributes_from_event_data(event_data: EventStateChangedData) -> Set:

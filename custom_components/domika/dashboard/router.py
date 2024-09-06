@@ -44,7 +44,6 @@ async def _update_dashboards(
             devices = await device_service.get_by_user_id(session, user_id)
 
         for device in devices:
-            LOGGER.debug("### domika_%s, dashboard_update", device.app_session_id)
             hass.bus.async_fire(
                 f"domika_{device.app_session_id}",
                 {

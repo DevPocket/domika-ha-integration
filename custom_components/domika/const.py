@@ -55,5 +55,5 @@ CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
     "gas_select_all": BinarySensorDeviceClass.GAS,
 }
 
-PUSH_DELAY_DEFAULT = 0
-PUSH_DELAY_FOR_DOMAIN = {"sensor": 4}
+PUSH_DELAY_DEFAULT = 2
+PUSH_DELAY_FOR_DOMAIN = {"sensor": 2}

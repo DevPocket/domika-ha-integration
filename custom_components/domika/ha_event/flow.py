@@ -148,14 +148,6 @@ def _fire_critical_sensor_notification(
         event.context,
         event.time_fired.timestamp(),  # TODO: convert to int?
     )
-    LOGGER.debug(
-        "### %s, %s, %s, %s, %s",
-        DOMIKA_CRITICAL_SENSOR_CHANGED,
-        sensors_data.to_dict(),
-        event.origin,
-        event.context.id,
-        event.time_fired,
-    )
 
 
 def _fire_event_to_app_session_ids(
@@ -177,14 +169,6 @@ def _fire_event_to_app_session_ids(
             event.origin,
             event.context,
             event.time_fired.timestamp(),
-        )
-        LOGGER.debug(
-            "### domika_%s, %s, %s, %s, %s",
-            app_session_id,
-            dict_attributes,
-            event.origin,
-            event.context.id,
-            event.time_fired,
         )
 
 

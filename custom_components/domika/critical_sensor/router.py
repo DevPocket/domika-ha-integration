@@ -9,7 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import logging
-from typing import Any, cast
+from typing import Any, Optional
 
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
@@ -34,8 +34,8 @@ def websocket_domika_critical_sensors(
     msg: dict[str, Any],
 ):
     """Handle domika critical sensors request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "critical_sensors", msg_id is missing.')
         return
 

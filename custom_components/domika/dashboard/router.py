@@ -9,7 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import logging
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import domika_ha_framework.dashboard.service as dashboard_service
 import domika_ha_framework.database.core as database_core
@@ -81,8 +81,8 @@ async def websocket_domika_update_dashboards(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika update dashboards request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "update_dashboards", msg_id is missing.')
         return
 
@@ -119,8 +119,8 @@ async def websocket_domika_get_dashboards(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika get dashboards request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "get_dashboards", msg_id is missing.')
         return
 
@@ -169,8 +169,8 @@ async def websocket_domika_get_dashboards_hash(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika get dashboards hash update request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "get_dashboards_hash", msg_id is missing.')
         return
 

@@ -9,7 +9,7 @@ Author(s): Michael Bogorad
 """
 
 import logging
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import voluptuous as vol
 from domika_ha_framework.utils import flatten_json
@@ -35,8 +35,8 @@ def websocket_domika_entity_list(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika entity_list request."""
-    msg_id = msg.get("id")
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "entity_list", msg_id is missing.')
         return
 
@@ -63,8 +63,8 @@ def websocket_domika_entity_info(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika entity_info request."""
-    msg_id = msg.get("id")
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "entity_info", msg_id is missing.')
         return
 
@@ -91,8 +91,8 @@ async def websocket_domika_entity_state(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika entity_state request."""
-    msg_id = msg.get("id")
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "entity_state", msg_id is missing.')
         return
 

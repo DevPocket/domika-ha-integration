@@ -10,7 +10,7 @@ Author(s): Artem Bezborodko
 
 import logging
 import uuid
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.push_data.service as push_data_service
@@ -37,8 +37,8 @@ async def websocket_domika_confirm_events(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika confirm event request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "confirm_event", msg_id is missing.')
         return
 

@@ -10,7 +10,7 @@ Author(s): Artem Bezborodko
 
 import logging
 import uuid
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.subscription.flow as subscription_flow
@@ -38,8 +38,8 @@ async def websocket_domika_resubscribe(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika resubscribe request."""
-    msg_id = cast(int, msg.get("id"))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "resubscribe", msg_id is missing.')
         return
 

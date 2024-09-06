@@ -65,8 +65,6 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
             app_session_id,
         )
 
-        LOGGER.debug("delay: %s", delay)
-
         await asyncio.sleep(delay)
 
         try:

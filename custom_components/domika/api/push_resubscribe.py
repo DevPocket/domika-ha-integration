@@ -11,7 +11,7 @@ Author(s): Artem Bezborodko
 import logging
 import uuid
 from http import HTTPStatus
-from typing import cast
+from typing import Any, Optional
 
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.subscription.flow as subscription_flow
@@ -59,10 +59,7 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
         if not hass.data.get(DOMAIN):
             return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
-        LOGGER.debug("DomikaAPIPushResubscribe")
-
-        request_dict = await request.json()
-        LOGGER.debug("request_dict: %s", request_dict)
+        request_dict: dict[str, Any] = await request.json()
 
         app_session_id = request.headers.get("X-App-Session-Id")
         try:
@@ -73,7 +70,13 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        subscriptions = cast(dict[str, set[str]], request_dict.get("subscriptions", None))
+        LOGGER.debug(
+            "DomikaAPIPushResubscribe: request_dict: %s, app_session_id: %s",
+            request_dict,
+            app_session_id,
+        )
+
+        subscriptions: Optional[dict[str, set[str]]] = request_dict.get("subscriptions")
         if not subscriptions:
             return self.json_message(
                 "Missing or malformed subscriptions.",
@@ -85,11 +88,11 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
                 await subscription_flow.resubscribe_push(session, app_session_id, subscriptions)
         except DomikaFrameworkBaseError as e:
             LOGGER.error('Can\'t resubscribe push "%s". Framework error. %s', subscriptions, e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
         except Exception as e:
             LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        # TODO: is it OK to send success after failed resubscribe_push?
         data = {"result": "success"}
         LOGGER.debug("DomikaAPIPushResubscribe data: %s", data)
-
         return self.json(data, HTTPStatus.OK)

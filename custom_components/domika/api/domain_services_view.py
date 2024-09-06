@@ -40,13 +40,11 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
         if not hass.data.get(DOMAIN):
             return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
-        LOGGER.debug("DomikaAPIDomainServicesView, domain: %s, service: %s", domain, service)
-
         # Perform control over entities via given request.
         response = await super().post(request, domain, service)
 
         app_session_id = request.headers.get("X-App-Session-Id")
-        LOGGER.debug("app_session_id: %s", app_session_id)
+
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
@@ -56,7 +54,14 @@ class DomikaAPIDomainServicesView(APIDomainServicesView):
             )
 
         delay = float(request.headers.get("X-Delay", 0.5))
-        LOGGER.debug("delay: %s", delay)
+
+        LOGGER.debug(
+            "DomikaAPIDomainServicesView, domain: %s, service: %s, app_session_id: %s, delay: %s",
+            domain,
+            service,
+            app_session_id,
+            delay,
+        )
 
         await asyncio.sleep(delay)
 

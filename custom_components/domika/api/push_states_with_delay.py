@@ -60,11 +60,9 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
         need_push = None if ignore_need_push else True
 
         LOGGER.debug(
-            "DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s, "
-            "ignore_need_push: %s",
+            "DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s",
             request_dict,
             app_session_id,
-            ignore_need_push,
         )
 
         LOGGER.debug("delay: %s", delay)

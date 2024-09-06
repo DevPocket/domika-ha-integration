@@ -4,13 +4,12 @@ import logging
 import os
 from datetime import timedelta
 
+from homeassistant.components import binary_sensor, sensor
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "domika"
-# MAIN_LOGGER_NAME = DOMAIN
-
 
 if os.getenv("DOMIKA_DEBUG") == "1":
     PUSH_SERVER_URL = os.getenv("DOMIKA_PUSH_SERVER_URL")
@@ -22,27 +21,23 @@ else:
 # Seconds
 PUSH_SERVER_TIMEOUT = 10
 
-SENSORS_DOMAIN = "binary_sensor"
+SENSORS_DOMAIN = binary_sensor.DOMAIN
 
-CRITICAL_NOTIFICATION_SENSORS = [
-    BinarySensorDeviceClass.CO,
-    BinarySensorDeviceClass.GAS,
-    BinarySensorDeviceClass.MOISTURE,
-    BinarySensorDeviceClass.SMOKE,
+CRITICAL_NOTIFICATION_DEVICE_CLASSES = [
+    BinarySensorDeviceClass.CO.value,
+    BinarySensorDeviceClass.GAS.value,
+    BinarySensorDeviceClass.MOISTURE.value,
+    BinarySensorDeviceClass.SMOKE.value,
 ]
-
-WARNING_NOTIFICATION_SENSORS = [
-    BinarySensorDeviceClass.BATTERY,
-    BinarySensorDeviceClass.COLD,
-    BinarySensorDeviceClass.HEAT,
-    BinarySensorDeviceClass.PROBLEM,
-    BinarySensorDeviceClass.VIBRATION,
-    BinarySensorDeviceClass.SAFETY,
-    BinarySensorDeviceClass.TAMPER,
+WARNING_NOTIFICATION_DEVICE_CLASSES = [
+    BinarySensorDeviceClass.BATTERY.value,
+    BinarySensorDeviceClass.COLD.value,
+    BinarySensorDeviceClass.HEAT.value,
+    BinarySensorDeviceClass.PROBLEM.value,
+    BinarySensorDeviceClass.VIBRATION.value,
+    BinarySensorDeviceClass.SAFETY.value,
+    BinarySensorDeviceClass.TAMPER.value,
 ]
-
-CRITICAL_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in CRITICAL_NOTIFICATION_SENSORS]
-WARNING_NOTIFICATION_DEVICE_CLASSES = [str(e) for e in WARNING_NOTIFICATION_SENSORS]
 
 CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
     "smoke_select_all": BinarySensorDeviceClass.SMOKE,
@@ -52,4 +47,4 @@ CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
 }
 
 PUSH_DELAY_DEFAULT = 2
-PUSH_DELAY_FOR_DOMAIN = {"sensor": 2}
+PUSH_DELAY_FOR_DOMAIN = {sensor.const.DOMAIN: 2}

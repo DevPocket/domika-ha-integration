@@ -46,5 +46,6 @@ CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES = {
     "gas_select_all": BinarySensorDeviceClass.GAS,
 }
 
+# How many cycles should we skip till push notification is sent.
 PUSH_DELAY_DEFAULT = 2
 PUSH_DELAY_FOR_DOMAIN = {sensor.const.DOMAIN: 2}

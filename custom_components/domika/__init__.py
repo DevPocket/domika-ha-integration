@@ -41,6 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Init framework library.
     try:
+        LOGGER.debug(f"database_url: sqlite+aiosqlite:///{hass.config.path()}/Domika.db")
         await domika_ha_framework.init(
             config.Config(
                 database_url=f"sqlite+aiosqlite:///{hass.config.path()}/Domika.db",
@@ -126,9 +127,9 @@ async def async_unload_entry(hass: HomeAssistant, _entry: ConfigEntry) -> bool:
         task.cancel("Unloading entry")
 
     # Unsubscribe from events.
-    if cancel_registgrator_cb := hass.data[DOMAIN].get("cancel_registgrator_cb", None):
-        cancel_registgrator_cb()
-        hass.data[DOMAIN]["cancel_registgrator_cb"] = None
+    if cancel_registrator_cb := hass.data[DOMAIN].get("cancel_registrator_cb", None):
+        cancel_registrator_cb()
+        hass.data[DOMAIN]["cancel_registrator_cb"] = None
 
     await asyncio.sleep(0)
 
@@ -174,7 +175,7 @@ async def _on_homeassistant_started(hass: HomeAssistant):
     BACKGROUND_TASKS[BackgroundTask.EVENT_PUSHER] = event_pusher_task
 
     # Setup Domika event registrator.
-    hass.data[DOMAIN]["cancel_registgrator_cb"] = hass.bus.async_listen(
+    hass.data[DOMAIN]["cancel_registrator_cb"] = hass.bus.async_listen(
         EVENT_STATE_CHANGED,
         partial(ha_event_flow.register_event, hass),
     )

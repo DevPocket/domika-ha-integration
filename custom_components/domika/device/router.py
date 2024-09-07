@@ -30,6 +30,8 @@ from homeassistant.components.websocket_api.decorators import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.const import __version__ as hass_version
+from homeassistant.loader import async_get_integration
 
 from ..const import DOMAIN
 
@@ -81,6 +83,14 @@ async def _get_hass_network_properties(hass: HomeAssistant) -> dict:
     return {k: v for k, v in result.items() if v is not None}
 
 
+async def _get_hass_domika_properties(hass: HomeAssistant) -> dict:
+    result = {"hass_version": hass_version}
+    domika = await async_get_integration(hass, "domika")
+    if domika:
+        result["domika_version"] = domika.version
+    return result
+
+
 def _get_entry(hass: HomeAssistant) -> Optional[ConfigEntry]:
     domain_data: dict[str, Any] = hass.data.get(DOMAIN, {})
     return domain_data.get("entry")
@@ -124,6 +134,7 @@ async def websocket_domika_update_app_session(
 
         result = {"app_session_id": app_session_id, "old_app_session_ids": old_app_session_ids}
         result.update(await _get_hass_network_properties(hass))
+        result.update(await _get_hass_domika_properties(hass))
     except DomikaFrameworkBaseError as e:
         LOGGER.error("Can't updated app session id. Framework error. %s", e)
         result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}

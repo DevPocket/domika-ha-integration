@@ -13,14 +13,16 @@ import logging
 import uuid
 from http import HTTPStatus
 
-import sqlalchemy.exc
+import domika_ha_framework.database.core as database_core
+import domika_ha_framework.push_data.service as push_data_service
 from aiohttp import web
+from domika_ha_framework.errors import DomikaFrameworkBaseError
 from homeassistant.components.api import APIDomainServicesView
+from homeassistant.core import async_get_hass
 from homeassistant.helpers.json import json_bytes
 
-from ..database.core import AsyncSessionFactory
+from ..const import DOMAIN
 from ..ha_entity import service as ha_entity_service
-from ..push_data import service as push_data_service
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,43 +30,57 @@ LOGGER = logging.getLogger(__name__)
 class DomikaAPIDomainServicesView(APIDomainServicesView):
     """View to handle Status requests."""
 
-    url = '/domika/services/{domain}/{service}'
-    name = 'domika:domain-services'
+    url = "/domika/services/{domain}/{service}"
+    name = "domika:domain-services"
 
     async def post(self, request: web.Request, domain: str, service: str) -> web.Response:
         """Retrieve if API is running."""
-        LOGGER.debug('DomikaAPIDomainServicesView, domain: %s, service: %s', domain, service)
+        # Check that integration still loaded.
+        hass = async_get_hass()
+        if not hass.data.get(DOMAIN):
+            return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
+
         # Perform control over entities via given request.
         response = await super().post(request, domain, service)
 
-        app_session_id = request.headers.get('X-App-Session-Id')
-        LOGGER.debug('app_session_id: %s', app_session_id)
+        app_session_id = request.headers.get("X-App-Session-Id")
+
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
             return self.json_message(
-                'Missing or malformed X-App-Session-Id.',
+                "Missing or malformed X-App-Session-Id.",
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        delay = float(request.headers.get('X-Delay', 0.5))
-        LOGGER.debug('delay: %s', delay)
+        delay = float(request.headers.get("X-Delay", 0.5))
+
+        LOGGER.debug(
+            "DomikaAPIDomainServicesView, domain: %s, service: %s, app_session_id: %s, delay: %s",
+            domain,
+            service,
+            app_session_id,
+            delay,
+        )
 
         await asyncio.sleep(delay)
 
         try:
-            async with AsyncSessionFactory() as session:
+            async with database_core.get_session() as session:
                 result = await ha_entity_service.get(session, app_session_id)
-            await push_data_service.delete_for_app_session(session, app_session_id=app_session_id)
+                await push_data_service.delete_for_app_session(
+                    session,
+                    app_session_id=app_session_id,
+                )
 
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            LOGGER.error('DomikaAPIDomainServicesView post. Database error. %s', e)
-            return self.json_message('Database error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+        except DomikaFrameworkBaseError as e:
+            LOGGER.error("DomikaAPIDomainServicesView post. Framework error. %s", e)
+            return self.json_message("Framework error.", HTTPStatus.INTERNAL_SERVER_ERROR)
         except Exception as e:
-            LOGGER.exception('DomikaAPIDomainServicesView post. Unhandled error. %s', e)
-            return self.json_message('Internal error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+            LOGGER.exception("DomikaAPIDomainServicesView post. Unhandled error. %s", e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        LOGGER.debug('DomikaAPIDomainServicesView data: %s', {'entities': result})
-        data = json_bytes({'entities': result})
+        LOGGER.debug("DomikaAPIDomainServicesView data: %s", {"entities": result})
+        data = json_bytes({"entities": result})
         response.body = data
         return response

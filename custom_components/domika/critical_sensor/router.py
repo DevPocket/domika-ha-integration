@@ -9,14 +9,14 @@ Author(s): Artem Bezborodko
 """
 
 import logging
-from typing import Any, cast
+from typing import Any, Optional
 
 import voluptuous as vol
 from homeassistant.components.websocket_api.connection import ActiveConnection
 from homeassistant.components.websocket_api.decorators import websocket_command
 from homeassistant.core import HomeAssistant, callback
 
-from ..critical_sensor.enums import NotificationType
+from .enums import NotificationType
 from .service import get
 
 LOGGER = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ LOGGER = logging.getLogger(__name__)
 
 @websocket_command(
     {
-        vol.Required('type'): 'domika/critical_sensors',
+        vol.Required("type"): "domika/critical_sensors",
     },
 )
 @callback
@@ -34,8 +34,8 @@ def websocket_domika_critical_sensors(
     msg: dict[str, Any],
 ):
     """Handle domika critical sensors request."""
-    msg_id = cast(int, msg.get('id'))
-    if not msg_id:
+    msg_id: Optional[int] = msg.get("id")
+    if msg_id is None:
         LOGGER.error('Got websocket message "critical_sensors", msg_id is missing.')
         return
 
@@ -45,4 +45,4 @@ def websocket_domika_critical_sensors(
     result = sensors_data.to_dict()
 
     connection.send_result(msg_id, result)
-    LOGGER.debug('critical_sensors msg_id=%s data=%s', msg_id, result)
+    LOGGER.debug("critical_sensors msg_id=%s data=%s", msg_id, result)

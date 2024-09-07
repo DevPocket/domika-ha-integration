@@ -8,15 +8,22 @@ Critical sensor.
 Author(s): Artem Bezborodko
 """
 
-from typing import cast
 import logging
+from typing import Any, Optional
 
 import homeassistant.helpers.entity_registry
+from homeassistant.components import binary_sensor
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_ON
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
+from homeassistant.helpers.entity_registry import RegistryEntry
 
-from ..const import DOMAIN, CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES, CRITICAL_NOTIFICATION_DEVICE_CLASSES, SENSORS_DOMAIN, \
-    WARNING_NOTIFICATION_DEVICE_CLASSES
+from ..const import (
+    CRITICAL_NOTIFICATION_DEVICE_CLASSES,
+    CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES,
+    DOMAIN,
+    SENSORS_DOMAIN,
+    WARNING_NOTIFICATION_DEVICE_CLASSES,
+)
 from .enums import NotificationType
 from .models import DomikaNotificationSensor, DomikaNotificationSensorsRead
 
@@ -35,12 +42,12 @@ def get(hass: HomeAssistant, notification_types: NotificationType) -> DomikaNoti
     entity_ids = hass.states.async_entity_ids(SENSORS_DOMAIN)
     entity_registry = homeassistant.helpers.entity_registry.async_get(hass)
 
-    domain_data = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities") if domain_data else {}
-    critical_included_entity_ids = critical_entities.get('critical_included_entity_ids', [])
+    domain_data: Optional[dict[str, Any]] = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities", {}) if domain_data else {}
+    critical_included_entity_ids = critical_entities.get("critical_included_entity_ids", [])
 
     for entity_id in entity_ids:
-        entity = entity_registry.entities.get(entity_id)
+        entity: Optional[RegistryEntry] = entity_registry.entities.get(entity_id)
         if not entity or entity.hidden_by or entity.disabled_by:
             continue
 
@@ -53,8 +60,12 @@ def get(hass: HomeAssistant, notification_types: NotificationType) -> DomikaNoti
         if sensor_notification_type is None or sensor_notification_type not in notification_types:
             continue
 
-        sensor_state = hass.states.get(entity_id)
+        sensor_state: Optional[State] = hass.states.get(entity_id)
         if not sensor_state:
+            continue
+
+        device_class: Optional[str] = sensor_state.attributes.get(ATTR_DEVICE_CLASS)
+        if not device_class:
             continue
 
         result.sensors.append(
@@ -62,7 +73,7 @@ def get(hass: HomeAssistant, notification_types: NotificationType) -> DomikaNoti
                 entity_id=entity_id,
                 name=sensor_state.name,
                 type=sensor_notification_type,
-                device_class=cast(str, sensor_state.attributes.get(ATTR_DEVICE_CLASS)),
+                device_class=device_class,
                 state=sensor_state.state,
                 timestamp=int(
                     max(
@@ -81,7 +92,7 @@ def get(hass: HomeAssistant, notification_types: NotificationType) -> DomikaNoti
 
 def check_notification_type(hass: HomeAssistant, entity_id: str, types: NotificationType) -> bool:
     """
-    Check if entity is a sensor of certain notification types.
+    Check if entity is a binary sensor of certain notification types.
 
     Args:
         hass: homeassistant core object.
@@ -91,12 +102,12 @@ def check_notification_type(hass: HomeAssistant, entity_id: str, types: Notifica
     Returns:
         True if entity_id correspond to certain notification types, False otherwise.
     """
-    if not entity_id.startswith('binary_sensor.'):
+    if not entity_id.startswith(f"{binary_sensor.DOMAIN}."):
         return False
 
-    domain_data = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities") if domain_data else {}
-    critical_included_entity_ids = critical_entities.get('critical_included_entity_ids', [])
+    domain_data: Optional[dict[str, Any]] = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities", {}) if domain_data else {}
+    critical_included_entity_ids = critical_entities.get("critical_included_entity_ids", [])
     # If user manually added entity to the list for critical pushes — it's CRITICAL for us.
     if entity_id in critical_included_entity_ids and NotificationType.CRITICAL in types:
         return True
@@ -105,7 +116,7 @@ def check_notification_type(hass: HomeAssistant, entity_id: str, types: Notifica
     if not sensor:
         return False
 
-    sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
+    sensor_class = sensor.attributes.get(ATTR_DEVICE_CLASS)
 
     return any(sensor_class in NOTIFICATION_TYPE_TO_CLASSES[level] for level in types)
 
@@ -121,50 +132,31 @@ def critical_push_needed(hass: HomeAssistant, entity_id: str) -> bool:
     Returns:
         True user chose to get critical push notifications for this binary sensor.
     """
-    # LOGGER.debug('critical_push_needed, entity_id: %s', entity_id)
-
-    if not entity_id.startswith('binary_sensor.'):
+    if not entity_id.startswith(f"{binary_sensor.DOMAIN}."):
         return False
 
-    domain_data = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities") if domain_data else {}
-    critical_included_entity_ids = critical_entities.get('critical_included_entity_ids', [])
+    domain_data: Optional[dict[str, Any]] = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities", {}) if domain_data else {}
+    critical_included_entity_ids = critical_entities.get("critical_included_entity_ids", [])
     # If user manually added entity to the list for critical pushes — return True.
     if entity_id in critical_included_entity_ids:
-        # LOGGER.debug('found in critical_included_entity_ids, returning True')
         return True
 
     sensor = hass.states.get(entity_id)
     if not sensor:
-        # LOGGER.debug('not found in hass, returning False')
         return False
 
-    sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
-    # LOGGER.debug('sensor_class: %s', sensor_class)
-
-    # {
-    #   'smoke_select_all': True,
-    #   'moisture_select_all': True,
-    #   'co_select_all': False,
-    #   'gas_select_all': False,
-    #   'critical_included_entity_ids': [
-    #     'binary_sensor.back_door_door'
-    #   ]
-    # }
+    sensor_class = sensor.attributes.get(ATTR_DEVICE_CLASS)
 
     critical_device_classes_enabled = []
-    for (key, value) in critical_entities.items():
+    for key, value in critical_entities.items():
         if key in CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES and value:
             critical_device_classes_enabled.append(CRITICAL_PUSH_SETTINGS_DEVICE_CLASSES[key])
-    # LOGGER.debug('critical_device_classes_enabled: %s', critical_device_classes_enabled)
 
     return sensor_class in critical_device_classes_enabled
 
 
-def notification_type(
-    hass: HomeAssistant,
-    entity_id: str,
-) -> NotificationType | None:
+def notification_type(hass: HomeAssistant, entity_id: str) -> NotificationType | None:
     """
     Get notification type for binary sensor entity.
 
@@ -175,12 +167,12 @@ def notification_type(
     Returns:
         entity's notification type if applicable, None otherwise.
     """
-    if not entity_id.startswith('binary_sensor.'):
+    if not entity_id.startswith(f"{binary_sensor.DOMAIN}."):
         return None
 
-    domain_data = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities") if domain_data else {}
-    critical_included_entity_ids = critical_entities.get('critical_included_entity_ids', [])
+    domain_data: Optional[dict[str, Any]] = hass.data.get(DOMAIN)
+    critical_entities = domain_data.get("critical_entities", {}) if domain_data else {}
+    critical_included_entity_ids = critical_entities.get("critical_included_entity_ids", [])
     # If user manually added entity to the list for critical pushes — it's CRITICAL for us.
     if entity_id in critical_included_entity_ids:
         return NotificationType.CRITICAL
@@ -189,7 +181,7 @@ def notification_type(
     if not sensor:
         return None
 
-    sensor_class = cast(str, sensor.attributes.get(ATTR_DEVICE_CLASS))
+    sensor_class = sensor.attributes.get(ATTR_DEVICE_CLASS)
 
     return next(
         (

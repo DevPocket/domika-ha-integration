@@ -14,7 +14,7 @@ from custom_components.domika.subscription.flow import (
     get_app_session_id_by_attributes
 )
 from custom_components.domika.subscription.models import Subscription
-from custom_components.domika.push_data.service import create
+from custom_components.domika.ha_event.service import create
 from typing import Any, cast
 
 

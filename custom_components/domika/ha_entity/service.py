@@ -10,13 +10,13 @@ Author(s): Artem Bezborodko
 
 import logging
 import uuid
-from typing import Sequence
+from typing import Optional, Sequence
 
+import domika_ha_framework.subscription.service as subscription_service
+from domika_ha_framework.utils import flatten_json
 from homeassistant.core import async_get_hass
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..subscription import service as subscription_service
-from ..utils import flatten_json
 from .models import DomikaHaEntity
 
 LOGGER = logging.getLogger(__name__)
@@ -26,14 +26,19 @@ async def get(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     *,
-    need_push: bool = True,
-    entity_id: str = None,
+    need_push: Optional[bool] = True,
+    entity_id: Optional[str] = None,
 ) -> Sequence[DomikaHaEntity]:
     result: list[DomikaHaEntity] = []
 
     entities_attributes: dict[str, list[str]] = {}
 
-    subscriptions = await subscription_service.get(db_session, app_session_id, need_push=need_push, entity_id=entity_id)
+    subscriptions = await subscription_service.get(
+        db_session,
+        app_session_id,
+        need_push=need_push,
+        entity_id=entity_id,
+    )
 
     # Convolve entities attribute in for of dict:
     # { noqa: ERA001
@@ -51,12 +56,14 @@ async def get(
                 exclude={"c", "lc", "lu"},
             )
             filtered_dict = {k: v for (k, v) in flat_state.items() if k in attributes}
-            domikaEntity = DomikaHaEntity(
+            domika_entity = DomikaHaEntity(
                 entity_id=entity,
                 time_updated=max(state.last_changed, state.last_updated).timestamp(),
                 attributes=filtered_dict,
             )
-            result.append(domikaEntity,)
+            result.append(
+                domika_entity,
+            )
         else:
             LOGGER.error('ha_entity.get is requesting state of unknown entity: "%s"', entity)
 

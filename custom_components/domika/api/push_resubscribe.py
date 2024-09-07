@@ -8,20 +8,19 @@ Integration api.
 Author(s): Artem Bezborodko
 """
 
-import asyncio
 import logging
 import uuid
 from http import HTTPStatus
-from typing import cast
+from typing import Any, Optional
 
-import sqlalchemy
+import domika_ha_framework.database.core as database_core
+import domika_ha_framework.subscription.flow as subscription_flow
 from aiohttp import web
+from domika_ha_framework.errors import DomikaFrameworkBaseError
+from homeassistant.core import async_get_hass
 from homeassistant.helpers.http import HomeAssistantView
 
-from ..database.core import AsyncSessionFactory
-from ..ha_entity import service as ha_entity_service
-from ..push_data import service as push_data_service
-from ..subscription.flow import resubscribe_push
+from ..const import DOMAIN
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,8 +28,8 @@ LOGGER = logging.getLogger(__name__)
 class DomikaAPIPushResubscribe(HomeAssistantView):
     """Update subscriptions, set need_push=1 for the given attributes of given entities."""
 
-    url = '/domika/push_resubscribe'
-    name = 'domika:push-resubscribe'
+    url = "/domika/push_resubscribe"
+    name = "domika:push-resubscribe"
 
     def __init__(self) -> None:
         super().__init__()
@@ -52,38 +51,48 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
             ]
         }
     }"""
+
     async def post(self, request: web.Request) -> web.Response:
         """Post method."""
-        LOGGER.debug('DomikaAPIPushResubscribe')
+        # Check that integration still loaded.
+        hass = async_get_hass()
+        if not hass.data.get(DOMAIN):
+            return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
-        request_dict = await request.json()
-        LOGGER.debug('request_dict: %s', request_dict)
+        request_dict: dict[str, Any] = await request.json()
 
-        app_session_id = request.headers.get('X-App-Session-Id')
+        app_session_id = request.headers.get("X-App-Session-Id")
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
             return self.json_message(
-                'Missing or malformed X-App-Session-Id.',
+                "Missing or malformed X-App-Session-Id.",
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        subscriptions = cast(dict[str, set[str]], request_dict.get('subscriptions', None))
+        LOGGER.debug(
+            "DomikaAPIPushResubscribe: request_dict: %s, app_session_id: %s",
+            request_dict,
+            app_session_id,
+        )
+
+        subscriptions: Optional[dict[str, set[str]]] = request_dict.get("subscriptions")
         if not subscriptions:
             return self.json_message(
-                'Missing or malformed subscriptions.',
+                "Missing or malformed subscriptions.",
                 HTTPStatus.UNAUTHORIZED,
             )
 
         try:
-            async with AsyncSessionFactory() as session:
-                await resubscribe_push(session, app_session_id, subscriptions)
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            LOGGER.error('Can\'t resubscribe push "%s". Database error. %s', subscriptions, e)
+            async with database_core.get_session() as session:
+                await subscription_flow.resubscribe_push(session, app_session_id, subscriptions)
+        except DomikaFrameworkBaseError as e:
+            LOGGER.error('Can\'t resubscribe push "%s". Framework error. %s', subscriptions, e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
         except Exception as e:
             LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        data = {'result': "success"}
-        LOGGER.debug('DomikaAPIPushResubscribe data: %s', data)
-
+        data = {"result": "success"}
+        LOGGER.debug("DomikaAPIPushResubscribe data: %s", data)
         return self.json(data, HTTPStatus.OK)

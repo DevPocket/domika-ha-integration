@@ -9,9 +9,9 @@ Author(s): Michael Bogorad
 
 from tests_init import *
 from custom_components.domika.device.flow import update_app_session_id
-from custom_components.domika.push_data.models import PushData, DomikaEventCreate
-from custom_components.domika.push_data.flow import register_event
-from custom_components.domika.push_data.service import create, delete
+from custom_components.domika.ha_event.models import PushData, DomikaEventCreate
+from custom_components.domika.ha_event.flow import register_event
+from custom_components.domika.ha_event.service import create, delete
 from custom_components.domika.subscription.flow import resubscribe, get_push_attributes, get_app_session_id_by_attributes
 import sqlalchemy
 import sqlalchemy.dialects.sqlite as sqlite_dialect

@@ -12,14 +12,17 @@ import asyncio
 import logging
 import uuid
 from http import HTTPStatus
+from typing import Any
 
-import sqlalchemy
+import domika_ha_framework.database.core as database_core
+import domika_ha_framework.push_data.service as push_data_service
 from aiohttp import web
+from domika_ha_framework.errors import DomikaFrameworkBaseError
+from homeassistant.core import async_get_hass
 from homeassistant.helpers.http import HomeAssistantView
 
-from ..database.core import AsyncSessionFactory
+from ..const import DOMAIN
 from ..ha_entity import service as ha_entity_service
-from ..push_data import service as push_data_service
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,54 +30,65 @@ LOGGER = logging.getLogger(__name__)
 class DomikaAPIPushStatesWithDelay(HomeAssistantView):
     """Push state with delay endpoint."""
 
-    url = '/domika/push_states_with_delay'
-    name = 'domika:push-states-with-delay'
+    url = "/domika/push_states_with_delay"
+    name = "domika:push-states-with-delay"
 
     def __init__(self) -> None:
         super().__init__()
 
     async def post(self, request: web.Request) -> web.Response:
         """Post method."""
-        LOGGER.debug('DomikaAPIPushStatesWithDelay')
+        # Check that integration still loaded.
+        hass = async_get_hass()
+        if not hass.data.get(DOMAIN):
+            return self.json_message("Route not found.", HTTPStatus.NOT_FOUND)
 
-        request_dict = await request.json()
+        request_dict: dict[str, Any] = await request.json()
 
-        app_session_id = request.headers.get('X-App-Session-Id')
+        app_session_id = request.headers.get("X-App-Session-Id")
         try:
             app_session_id = uuid.UUID(app_session_id)
         except (TypeError, ValueError):
             return self.json_message(
-                'Missing or malformed X-App-Session-Id.',
+                "Missing or malformed X-App-Session-Id.",
                 HTTPStatus.UNAUTHORIZED,
             )
 
-        entity_id = request_dict.get('entity_id')
-        delay = float(request_dict.get('delay', 0))
+        entity_id = request_dict.get("entity_id")
+        delay = float(request_dict.get("delay", 0))
+        ignore_need_push = request_dict.get("ignore_need_push", False)
+        need_push = None if ignore_need_push else True
 
-        ignore_need_push = request_dict.get('ignore_need_push')
-        need_push = True if not ignore_need_push else False
         LOGGER.debug(
-            'DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s, ignore_need_push: %s',
+            "DomikaAPIPushStatesWithDelay: request_dict: %s, app_session_id: %s",
             request_dict,
             app_session_id,
-            ignore_need_push
         )
 
         await asyncio.sleep(delay)
 
         try:
-            async with AsyncSessionFactory() as session:
-                result = await ha_entity_service.get(session, app_session_id, need_push=need_push, entity_id=entity_id)
-                await push_data_service.delete_for_app_session(session, app_session_id=app_session_id, entity_id=entity_id)
+            async with database_core.get_session() as session:
+                result = await ha_entity_service.get(
+                    session,
+                    app_session_id,
+                    need_push=need_push,
+                    entity_id=entity_id,
+                )
+                await push_data_service.delete_for_app_session(
+                    session,
+                    app_session_id=app_session_id,
+                    entity_id=entity_id,
+                )
 
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            LOGGER.error('DomikaAPIPushStatesWithDelay. Database error. %s', e)
-            return self.json_message('Database error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+        except DomikaFrameworkBaseError as e:
+            LOGGER.error("DomikaAPIPushStatesWithDelay. Framework error. %s", e)
+            return self.json_message("Framework error.", HTTPStatus.INTERNAL_SERVER_ERROR)
         except Exception as e:
-            LOGGER.exception('DomikaAPIPushStatesWithDelay. Unhandled error. %s', e)
-            return self.json_message('Internal error.', HTTPStatus.INTERNAL_SERVER_ERROR)
+            LOGGER.exception("DomikaAPIPushStatesWithDelay. Unhandled error. %s", e)
+            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        data = {'entities': result}
-        LOGGER.debug('DomikaAPIPushStatesWithDelay data: %s', data)
+        data = {"entities": result}
+        LOGGER.debug("DomikaAPIPushStatesWithDelay data: %s", data)
 
         return self.json(data, HTTPStatus.OK)

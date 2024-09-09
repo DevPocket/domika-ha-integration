@@ -43,7 +43,7 @@ def get(hass: HomeAssistant, notification_types: NotificationType) -> DomikaNoti
     entity_registry = homeassistant.helpers.entity_registry.async_get(hass)
 
     domain_data: Optional[dict[str, Any]] = hass.data.get(DOMAIN)
-    critical_entities = domain_data.get("critical_entities", {}) if domain_data else {}
+    critical_entities = (domain_data.get("critical_entities", {}) if domain_data else {}) or {}
     critical_included_entity_ids = critical_entities.get("critical_included_entity_ids", [])
 
     for entity_id in entity_ids:

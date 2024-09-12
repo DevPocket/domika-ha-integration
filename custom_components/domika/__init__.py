@@ -41,7 +41,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Init framework library.
     try:
-        LOGGER.debug(f"database_url: sqlite+aiosqlite:///{hass.config.path()}/Domika.db")
         await domika_ha_framework.init(
             config.Config(
                 database_url=f"sqlite+aiosqlite:///{hass.config.path()}/Domika.db",

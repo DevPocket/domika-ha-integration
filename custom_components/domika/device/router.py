@@ -117,7 +117,7 @@ async def websocket_domika_update_app_session(
 
     LOGGER.debug('Got websocket message "update_app_session", data: %s', msg)
 
-    push_token_hash = cast(str, msg.get("push_token_hash"))
+    push_token_hash = cast(str, msg.get("push_token_hash") or "")
     app_session_id: Optional[uuid.UUID] = None
     with contextlib.suppress(TypeError):
         app_session_id = uuid.UUID(msg.get("app_session_id"))

@@ -40,7 +40,7 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
 
     attributes = _get_changed_attributes_from_event_data(event_data)
 
-    LOGGER.debug("Got event for entity: %s, attributes: %s", entity_id, attributes)
+    # LOGGER.debug("Got event for entity: %s, attributes: %s", entity_id, attributes)
 
     if not attributes:
         return

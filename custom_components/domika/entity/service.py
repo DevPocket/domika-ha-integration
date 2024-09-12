@@ -11,11 +11,12 @@ Author(s): Michael Bogorad
 import logging
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.climate.const import ClimateEntityFeature
+from homeassistant.components.climate import ClimateEntityFeature
+from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.components.light import ColorMode, LightEntityFeature, get_supported_color_modes
 from homeassistant.components.search import ItemType, Searcher
-from homeassistant.components.sensor.const import SensorDeviceClass
-from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_FRIENDLY_NAME
+from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_FRIENDLY_NAME, Platform
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import (
     device_registry,
@@ -78,6 +79,28 @@ def _capabilities_climate(hass: HomeAssistant, entity_id: str) -> set[str]:
         capabilities.add("humidity")
     if supported_features & ClimateEntityFeature.FAN_MODE:
         capabilities.add("fan")
+    return capabilities
+
+
+def _capabilities_cover(hass: HomeAssistant, entity_id: str) -> set[str]:
+    capabilities = set()
+    supported_features = hass_entity.get_supported_features(hass, entity_id) # CoverEntityFeature
+    if supported_features & CoverEntityFeature.OPEN:
+        capabilities.add("open")
+    if supported_features & CoverEntityFeature.CLOSE:
+        capabilities.add("close")
+    if supported_features & CoverEntityFeature.STOP:
+        capabilities.add("stop")
+    if supported_features & CoverEntityFeature.SET_POSITION:
+        capabilities.add("setPosition")
+    if supported_features & CoverEntityFeature.OPEN_TILT:
+        capabilities.add("openTilt")
+    if supported_features & CoverEntityFeature.CLOSE_TILT:
+        capabilities.add("closeTilt")
+    if supported_features & CoverEntityFeature.STOP_TILT:
+        capabilities.add("stopTilt")
+    if supported_features & CoverEntityFeature.SET_TILT_POSITION:
+        capabilities.add("setTiltPosition")
     return capabilities
 
 
@@ -176,13 +199,15 @@ def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo | None:
 
     # Find out the capabilities of the entity, to be able to select widget size appropriately
     capabilities = set()
-    if state.domain == "light":
+    if state.domain == Platform.LIGHT:
         capabilities = _capabilities_light(hass, entity_id)
-    elif state.domain == "climate":
+    elif state.domain == Platform.CLIMATE:
         capabilities = _capabilities_climate(hass, entity_id)
-    elif state.domain == "sensor":
+    elif state.domain == Platform.COVER:
+        capabilities = _capabilities_cover(hass, entity_id)
+    elif state.domain == Platform.SENSOR:
         capabilities = _capabilities_sensor(hass, state)
-    elif state.domain == "binary_sensor":
+    elif state.domain == Platform.BINARY_SENSOR:
         capabilities = _capabilities_binary_sensor(hass, state)
     if capabilities:
         result.info["capabilities"] = capabilities

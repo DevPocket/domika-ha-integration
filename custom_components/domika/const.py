@@ -15,7 +15,7 @@ if os.getenv("DOMIKA_DEBUG") == "1":
     PUSH_SERVER_URL = os.getenv("DOMIKA_PUSH_SERVER_URL")
     PUSH_INTERVAL = timedelta(seconds=int(os.getenv("DOMIKA_PUSH_INTERVAL") or 30))
 else:
-    PUSH_SERVER_URL = "https://159.203.109.27:8000/api/v1"
+    PUSH_SERVER_URL = "https://pns.domika.app/api/v1"
     PUSH_INTERVAL = timedelta(minutes=15)
 
 # Seconds

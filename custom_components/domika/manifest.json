@@ -10,7 +10,7 @@
   "loggers": ["domika"],
   "requirements": [
     "aiohttp>=3.9.5",
-    "domika-ha-framework==0.0.2"
+    "domika-ha-framework==0.0.1"
   ],
   "documentation": "https://github.com/DevPocket/domika-ha-integration",
   "issue_tracker": "https://github.com/DevPocket/domika-ha-integration/issues",

@@ -96,9 +96,23 @@ def _get_entry(hass: HomeAssistant) -> Optional[ConfigEntry]:
     return domain_data.get("entry")
 
 
+
+def _check_app_compatibility(
+    os_platform: str,
+    os_version: str,
+    app_id: str,
+    app_version: str,
+) -> bool:
+    return False
+
+
 @websocket_command(
     {
         vol.Required("type"): "domika/update_app_session",
+        vol.Required("os_platform"): str,
+        vol.Required("os_version"): str,
+        vol.Required("app_id"): str,
+        vol.Required("app_version"): str,
         vol.Optional("app_session_id"): str,
         vol.Optional("push_token_hash"): str,
     },
@@ -117,30 +131,40 @@ async def websocket_domika_update_app_session(
 
     LOGGER.debug('Got websocket message "update_app_session", data: %s', msg)
 
-    push_token_hash = cast(str, msg.get("push_token_hash") or "")
-    app_session_id: Optional[uuid.UUID] = None
-    with contextlib.suppress(TypeError):
-        app_session_id = uuid.UUID(msg.get("app_session_id"))
+    # Check that the app is compatible with current version.
+    os_platform: str = msg.get("os_platform")
+    os_version: str = msg.get("os_version")
+    app_id: str = msg.get("app_id")
+    app_version: str = msg.get("app_version")
+    app_compatible = _check_app_compatibility(os_platform, os_version, app_id, app_version)
+    if not app_compatible:
+        LOGGER.error("update_app_session unsupported app or platform")
+        result = {"error": "unsupported app or platform"}
+    else:
+        push_token_hash = cast(str, msg.get("push_token_hash") or "")
+        app_session_id: Optional[uuid.UUID] = None
+        with contextlib.suppress(TypeError):
+            app_session_id = uuid.UUID(msg.get("app_session_id"))
 
-    try:
-        async with database_core.get_session() as session:
-            app_session_id, old_app_session_ids = await device_flow.update_app_session_id(
-                session,
-                app_session_id,
-                connection.user.id,
-                push_token_hash,
-            )
-            LOGGER.info('Successfully updated app session id "%s".', app_session_id)
+        try:
+            async with database_core.get_session() as session:
+                app_session_id, old_app_session_ids = await device_flow.update_app_session_id(
+                    session,
+                    app_session_id,
+                    connection.user.id,
+                    push_token_hash,
+                )
+                LOGGER.info('Successfully updated app session id "%s".', app_session_id)
 
-        result = {"app_session_id": app_session_id, "old_app_session_ids": old_app_session_ids}
-        result.update(await _get_hass_network_properties(hass))
-        result.update(await _get_hass_domika_properties(hass))
-    except DomikaFrameworkBaseError as e:
-        LOGGER.error("Can't updated app session id. Framework error. %s", e)
-        result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}
-    except Exception as e:
-        LOGGER.exception("Can't updated app session id. Unhandled error. %s", e)
-        result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}
+            result = {"app_session_id": app_session_id, "old_app_session_ids": old_app_session_ids}
+            result.update(await _get_hass_network_properties(hass))
+            result.update(await _get_hass_domika_properties(hass))
+        except DomikaFrameworkBaseError as e:
+            LOGGER.error("Can't updated app session id. Framework error. %s", e)
+            result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}
+        except Exception as e:
+            LOGGER.exception("Can't updated app session id. Unhandled error. %s", e)
+            result = {"app_session_id": app_session_id, "old_app_session_ids": app_session_id}
 
     connection.send_result(msg_id, result)
     LOGGER.debug("update_app_session msg_id=%s data=%s", msg_id, result)

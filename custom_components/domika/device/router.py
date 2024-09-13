@@ -105,8 +105,7 @@ def _check_app_compatibility(
 ) -> bool:
     if app_version == "0":
         return False
-    else:
-        return True
+    return True
 
 
 @websocket_command(
@@ -135,10 +134,10 @@ async def websocket_domika_update_app_session(
     LOGGER.debug('Got websocket message "update_app_session", data: %s', msg)
 
     # Check that the app is compatible with current version.
-    os_platform: str = msg.get("os_platform")
-    os_version: str = msg.get("os_version")
-    app_id: str = msg.get("app_id")
-    app_version: str = msg.get("app_version")
+    os_platform: str = msg.get("os_platform", "")
+    os_version: str = msg.get("os_version", "")
+    app_id: str = msg.get("app_id", "")
+    app_version: str = msg.get("app_version", "")
     app_compatible = _check_app_compatibility(
         os_platform.lower(),
         os_version.lower(),

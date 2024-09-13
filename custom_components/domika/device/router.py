@@ -103,7 +103,7 @@ def _check_app_compatibility(
     app_id: str,
     app_version: str,
 ) -> bool:
-    return False
+    return True
 
 
 @websocket_command(

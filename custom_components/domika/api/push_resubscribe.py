@@ -1,28 +1,18 @@
-# vim: set fileencoding=utf-8
-"""
-Integration api.
+"""Integration resubscribe api."""
 
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
-
-import logging
-import uuid
 from http import HTTPStatus
-from typing import Any, Optional
+from typing import Any
+import uuid
 
-import domika_ha_framework.database.core as database_core
-import domika_ha_framework.subscription.flow as subscription_flow
 from aiohttp import web
+import domika_ha_framework.database.core as database_core
 from domika_ha_framework.errors import DomikaFrameworkBaseError
+import domika_ha_framework.subscription.flow as subscription_flow
+
 from homeassistant.core import async_get_hass
 from homeassistant.helpers.http import HomeAssistantView
 
-from ..const import DOMAIN
-
-LOGGER = logging.getLogger(__name__)
+from ..const import DOMAIN, LOGGER
 
 
 class DomikaAPIPushResubscribe(HomeAssistantView):
@@ -30,27 +20,6 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
 
     url = "/domika/push_resubscribe"
     name = "domika:push-resubscribe"
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    """{
-        "app_session_id": "0eb99a18-5907-484a-873d-9e87e29faa50",
-        "subscriptions": {
-            "light.basement_back_light":
-            [
-                "a.effect",
-                "a.brightness",
-                "s"
-            ],
-            "light.basement":
-            [
-                "a.hs_color",
-                "a.effect",
-                "s"
-            ]
-        }
-    }"""
 
     async def post(self, request: web.Request) -> web.Response:
         """Post method."""
@@ -61,9 +30,8 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
 
         request_dict: dict[str, Any] = await request.json()
 
-        app_session_id = request.headers.get("X-App-Session-Id")
         try:
-            app_session_id = uuid.UUID(app_session_id)
+            app_session_id = uuid.UUID(request.headers.get("X-App-Session-Id"))
         except (TypeError, ValueError):
             return self.json_message(
                 "Missing or malformed X-App-Session-Id.",
@@ -76,7 +44,7 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
             app_session_id,
         )
 
-        subscriptions: Optional[dict[str, set[str]]] = request_dict.get("subscriptions")
+        subscriptions: dict[str, set[str]] | None = request_dict.get("subscriptions")
         if not subscriptions:
             return self.json_message(
                 "Missing or malformed subscriptions.",
@@ -85,13 +53,23 @@ class DomikaAPIPushResubscribe(HomeAssistantView):
 
         try:
             async with database_core.get_session() as session:
-                await subscription_flow.resubscribe_push(session, app_session_id, subscriptions)
+                await subscription_flow.resubscribe_push(
+                    session, app_session_id, subscriptions
+                )
         except DomikaFrameworkBaseError as e:
-            LOGGER.error('Can\'t resubscribe push "%s". Framework error. %s', subscriptions, e)
-            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            LOGGER.exception('Can\'t resubscribe push "%s". Unhandled error. %s', subscriptions, e)
-            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
+            LOGGER.error(
+                'Can\'t resubscribe push "%s". Framework error. %s', subscriptions, e
+            )
+            return self.json_message(
+                "Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+        except Exception:  # noqa: BLE001
+            LOGGER.exception(
+                'Can\'t resubscribe push "%s". Unhandled error', subscriptions
+            )
+            return self.json_message(
+                "Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
         data = {"result": "success"}
         LOGGER.debug("DomikaAPIPushResubscribe data: %s", data)

@@ -1,34 +1,27 @@
-# vim: set fileencoding=utf-8
-"""
-Entity.
+"""Domika entity service."""
 
-(c) DevPocket, 2024
-
-
-Author(s): Michael Bogorad
-"""
-
-import logging
+from typing import cast
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.components.cover import CoverEntityFeature
-from homeassistant.components.light import ColorMode, LightEntityFeature, get_supported_color_modes
+from homeassistant.components.light import (
+    ColorMode,
+    LightEntityFeature,
+    get_supported_color_modes,
+)
 from homeassistant.components.search import ItemType, Searcher
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_FRIENDLY_NAME, Platform
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import (
-    device_registry,
-    entity_registry,
-)
-from homeassistant.helpers import (
+    device_registry as dr,
     entity as hass_entity,
+    entity_registry as er,
 )
 
+from ..const import LOGGER
 from .models import DomikaEntitiesList, DomikaEntityInfo
-
-LOGGER = logging.getLogger(__name__)
 
 
 def _related(hass: HomeAssistant, root_entity_id: str) -> set[str]:
@@ -61,7 +54,12 @@ def _capabilities_light(hass: HomeAssistant, entity_id: str) -> set[str]:
         capabilities.add("brightness")
         capabilities.add("color")
 
-    LOGGER.debug("%s supported_features: %s / %s", entity_id, supported_features, supported_modes)
+    LOGGER.debug(
+        "Entity_id: %s supported_features: %s / %s",
+        entity_id,
+        supported_features,
+        supported_modes,
+    )
 
     if supported_features & LightEntityFeature.EFFECT:
         capabilities.add("effect")
@@ -84,7 +82,9 @@ def _capabilities_climate(hass: HomeAssistant, entity_id: str) -> set[str]:
 
 def _capabilities_cover(hass: HomeAssistant, entity_id: str) -> set[str]:
     capabilities = set()
-    supported_features = hass_entity.get_supported_features(hass, entity_id) # CoverEntityFeature
+    supported_features = hass_entity.get_supported_features(
+        hass, entity_id
+    )  # CoverEntityFeature
     if supported_features & CoverEntityFeature.OPEN:
         capabilities.add("open")
     if supported_features & CoverEntityFeature.CLOSE:
@@ -106,13 +106,13 @@ def _capabilities_cover(hass: HomeAssistant, entity_id: str) -> set[str]:
 
 def _capabilities_sensor(_hass: HomeAssistant, state: State) -> set[str]:
     capabilities = set()
-    capabilities.add(state.attributes.get(ATTR_DEVICE_CLASS))
+    capabilities.add(cast(str, state.attributes.get(ATTR_DEVICE_CLASS)))
     return capabilities
 
 
 def _capabilities_binary_sensor(_hass: HomeAssistant, state: State) -> set[str]:
     capabilities = set()
-    capabilities.add(state.attributes.get(ATTR_DEVICE_CLASS))
+    capabilities.add(cast(str, state.attributes.get(ATTR_DEVICE_CLASS)))
     return capabilities
 
 
@@ -160,7 +160,7 @@ def _related_lock(hass: HomeAssistant, entity_id: str) -> dict:
 
 
 def _related_area(hass: HomeAssistant, entity_id: str) -> str:
-    if entity_entry := entity_registry.async_get(hass).async_get(entity_id):
+    if entity_entry := er.async_get(hass).async_get(entity_id):
         if entity_entry.area_id:
             return entity_entry.area_id
 
@@ -168,7 +168,7 @@ def _related_area(hass: HomeAssistant, entity_id: str) -> str:
         related_devices = searcher.async_search(ItemType.ENTITY, entity_id)
         if related_devices and "device" in related_devices:
             related_device_id = related_devices["device"].pop()
-            if device_entry := device_registry.async_get(hass).async_get(related_device_id):
+            if device_entry := dr.async_get(hass).async_get(related_device_id):
                 return device_entry.area_id or ""
     return ""
 
@@ -183,6 +183,7 @@ def _related_integrations(hass: HomeAssistant, entity_id: str) -> set:
 
 
 def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo | None:
+    """Get single entity info."""
     result = DomikaEntityInfo({})
     state = hass.states.get(entity_id)
     if not state:
@@ -224,7 +225,7 @@ def get_single(hass: HomeAssistant, entity_id: str) -> DomikaEntityInfo | None:
     return result
 
 
-def get(hass: HomeAssistant, domains: list) -> DomikaEntitiesList:
+def get(hass: HomeAssistant, domains: list[str]) -> DomikaEntitiesList:
     """Get names and related ids for all entities in specified domains."""
     entity_ids = hass.states.async_entity_ids(domains)
     result = DomikaEntitiesList({})

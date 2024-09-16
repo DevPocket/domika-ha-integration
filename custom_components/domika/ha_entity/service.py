@@ -1,34 +1,26 @@
-# vim: set fileencoding=utf-8
-"""
-Domika integration.
+"""HA entity service."""
 
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
-
-import logging
+from collections.abc import Sequence
 import uuid
-from typing import Optional, Sequence
 
 import domika_ha_framework.subscription.service as subscription_service
 from domika_ha_framework.utils import flatten_json
-from homeassistant.core import async_get_hass
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import DomikaHaEntity
+from homeassistant.core import async_get_hass
 
-LOGGER = logging.getLogger(__name__)
+from ..const import LOGGER
+from .models import DomikaHaEntity
 
 
 async def get(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     *,
-    need_push: Optional[bool] = True,
-    entity_id: Optional[str] = None,
+    need_push: bool | None = True,
+    entity_id: str | None = None,
 ) -> Sequence[DomikaHaEntity]:
+    """Get the attribute state of all entities from the subscription for the given app_session_id."""
     result: list[DomikaHaEntity] = []
 
     entities_attributes: dict[str, list[str]] = {}
@@ -45,7 +37,9 @@ async def get(
     #   "entity_id": ["attr1", "attr2"]
     # } noqa: ERA001
     for subscription in subscriptions:
-        entities_attributes.setdefault(subscription.entity_id, []).append(subscription.attribute)
+        entities_attributes.setdefault(subscription.entity_id, []).append(
+            subscription.attribute
+        )
 
     hass = async_get_hass()
     for entity, attributes in entities_attributes.items():
@@ -65,6 +59,9 @@ async def get(
                 domika_entity,
             )
         else:
-            LOGGER.error('ha_entity.get is requesting state of unknown entity: "%s"', entity)
+            LOGGER.error(
+                'Ha_entity.get is requesting state of unknown entity: "%s"',
+                entity,
+            )
 
     return result

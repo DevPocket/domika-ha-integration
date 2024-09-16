@@ -3,14 +3,17 @@
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import DOMAIN
-
-DOMIKA_SCHEMA = vol.Schema({})
 
 
 class DomikaConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -19,7 +22,9 @@ class DomikaConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 0
 
-    async def async_step_user(self, _user_input: dict[str, str] | None = None) -> FlowResult:
+    async def async_step_user(
+        self, _user_input: dict[str, str] | None = None
+    ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
         return self.async_create_entry(
             title=DOMAIN,
@@ -55,14 +60,14 @@ class OptionsFlowHandler(OptionsFlow):
     async def async_step_init(
         self,
         _user_input: dict[str, Any] | None = None,
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the options."""
         return await self.async_step_critical_entities()
 
     async def async_step_critical_entities(
         self,
         user_input: dict[str, Any] | None = None,
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage critical entities options."""
         if user_input is not None:
             self.options["critical_entities"] = user_input
@@ -101,7 +106,9 @@ class OptionsFlowHandler(OptionsFlow):
                     ): bool,
                     vol.Optional(
                         schema="critical_included_entity_ids",
-                        default=critical_entities.get("critical_included_entity_ids", []),
+                        default=critical_entities.get(
+                            "critical_included_entity_ids", []
+                        ),
                     ): entity_selector,
                 },
             ),

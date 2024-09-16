@@ -1,7 +1,8 @@
 name: Update from Home Assistant Core and create a HACS version
 run-name: Updating from Home Assistant Core and create a HACS version...
 runs-on: self-hosted
-schedule:
+on:
+  schedule:
     - cron: "0 0 1 1 *"
 jobs:
   from_core_to_hacs:

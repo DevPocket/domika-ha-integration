@@ -135,7 +135,7 @@ def _get_critical_alert_payload(hass: HomeAssistant, entity_id: str) -> dict:
     if entity:
         entity_class = entity.attributes.get(ATTR_DEVICE_CLASS)
         if entity_class:
-            alert_title = CRITICAL_PUSH_ALERT_STRINGS.get(entity_class, "")
+            alert_title = CRITICAL_PUSH_ALERT_STRINGS.get(entity_class) or alert_title
 
         alert_body = f"{entity.name}, " + alert_body
 

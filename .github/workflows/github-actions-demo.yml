@@ -3,14 +3,14 @@ run-name: Updating from Home Assistant Core and create a HACS version...
 runs-on: self-hosted
 on: []
 jobs:
-	from_core_to_hacs:
-			runs-on: ubuntu-latest
-			steps:
-					- run: echo "Downloading..."
-					- uses: actions/checkout@main
-						with:
-							name: https://github.com/DevPocket/homeassistant-core.git
-							ref: refs/heads/domika_integration
-					- run: echo "Removing old sources..."
-					- run: rm -r tests
-					- run: ls
+  from_core_to_hacs:
+      runs-on: ubuntu-latest
+      steps:
+          - run: echo "Downloading..."
+          - uses: actions/checkout@main
+            with:
+              name: https://github.com/DevPocket/homeassistant-core.git
+              ref: refs/heads/domika_integration
+          - run: echo "Removing old sources..."
+          - run: rm -r tests
+          - run: ls

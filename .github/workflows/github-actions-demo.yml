@@ -11,5 +11,5 @@ jobs:
               name: https://github.com/DevPocket/homeassistant-core.git
               ref: refs/heads/domika_integration
           - run: echo "Removing old sources..."
-          - run: rm -r tests
-          - run: ls
+          # - run: rm -r tests
+          # - run: ls

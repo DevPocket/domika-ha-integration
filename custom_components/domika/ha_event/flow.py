@@ -18,10 +18,11 @@ import domika_ha_framework.subscription.flow as subscription_flow
 from domika_ha_framework.errors import DomikaFrameworkBaseError
 from domika_ha_framework.push_data.models import DomikaPushDataCreate
 from domika_ha_framework.utils import flatten_json
+from homeassistant.const import ATTR_DEVICE_CLASS
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from ..const import PUSH_DELAY_DEFAULT, PUSH_DELAY_FOR_DOMAIN
+from ..const import PUSH_DELAY_DEFAULT, PUSH_DELAY_FOR_DOMAIN, CRITICAL_PUSH_ALERT_STRINGS
 from ..critical_sensor import service as critical_sensor_service
 from ..critical_sensor.enums import NotificationType
 
@@ -76,12 +77,14 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     ]
 
     critical_push_needed = (
-        critical_sensor_service.critical_push_needed(hass, entity_id) and ("s", "on") in attributes
+            critical_sensor_service.critical_push_needed(hass, entity_id) and ("s", "on") in attributes
     )
+
+    critical_alert_payload = _get_critical_alert_payload(hass, entity_id) if critical_push_needed else {}
 
     try:
         async with database_core.get_session() as session:
-            # Get application id's associated with attribues.
+            # Get application id's associated with attributes.
             app_session_ids = await subscription_flow.get_app_session_id_by_attributes(
                 session,
                 entity_id,
@@ -105,6 +108,7 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
                 async_get_clientsession(hass),
                 push_data=events,
                 critical_push_needed=critical_push_needed,
+                critical_alert_payload=critical_alert_payload
             )
     except DomikaFrameworkBaseError as e:
         LOGGER.exception(
@@ -113,6 +117,28 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
             attributes,
             e,
         )
+
+
+def _get_critical_alert_payload(hass, entity_id: str) -> dict:
+    """Create the payload for a critical push."""
+    alert_title = CRITICAL_PUSH_ALERT_STRINGS.get("default", "")
+    alert_body = hass.config.location_name
+
+    entity = hass.states.get(entity_id)
+    if entity:
+        entity_class = entity.attributes.get(ATTR_DEVICE_CLASS)
+        LOGGER.debug(">>> _get_critical_alert_payload entity_class %s", entity_class)
+        if entity_class:
+            alert_title = CRITICAL_PUSH_ALERT_STRINGS.get(entity_class, "")
+
+        alert_body = f"{entity.name}, " + alert_body
+
+    LOGGER.debug(">>> _get_critical_alert_payload alert_title: '%s',  alert_body: '%s'", alert_title, alert_body)
+    return \
+        {
+            "title-loc-key": alert_title,
+            "body": alert_body
+        }
 
 
 async def push_registered_events(hass: HomeAssistant):
@@ -134,8 +160,8 @@ def _get_changed_attributes_from_event_data(event_data: EventStateChangedData) -
 
 
 def _fire_critical_sensor_notification(
-    hass: HomeAssistant,
-    event: Event[EventStateChangedData],
+        hass: HomeAssistant,
+        event: Event[EventStateChangedData],
 ):
     # If entity id is a critical binary sensor.
     # Fetch state for all levels of critical binary sensors.
@@ -151,12 +177,12 @@ def _fire_critical_sensor_notification(
 
 
 def _fire_event_to_app_session_ids(
-    hass: HomeAssistant,
-    event: Event[EventStateChangedData],
-    event_id: uuid.UUID,
-    entity_id: str,
-    attributes: set[tuple],
-    app_session_ids: Sequence[uuid.UUID],
+        hass: HomeAssistant,
+        event: Event[EventStateChangedData],
+        event_id: uuid.UUID,
+        entity_id: str,
+        attributes: set[tuple],
+        app_session_ids: Sequence[uuid.UUID],
 ):
     dict_attributes = dict(attributes)
     dict_attributes["d.type"] = "state_changed"

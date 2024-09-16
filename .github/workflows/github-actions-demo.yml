@@ -8,7 +8,7 @@ jobs:
           - run: echo "Downloading..."
           - uses: actions/checkout@main
             with:
-              repository: https://github.com/DevPocket/homeassistant-core.git
+              repository: DevPocket/homeassistant-core.git
               ref: refs/heads/domika_integration
           - run: echo "Removing old sources..."
           # - run: rm -r tests

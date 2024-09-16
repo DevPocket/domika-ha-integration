@@ -6,7 +6,7 @@ jobs:
       runs-on: self-hosted
       steps:
           - run: echo "Downloading..."
-          - uses: actions/checkout@main
+          - uses: actions/checkout@v4
             with:
               repository: DevPocket/homeassistant-core.git
               ref: refs/heads/domika_integration

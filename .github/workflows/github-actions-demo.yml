@@ -3,7 +3,7 @@ run-name: Updating from Home Assistant Core and create a HACS version...
 runs-on: self-hosted
 on: []
 jobs:
-	Download-Extract-Commit-Push:
+	from_core_to_hacs:
 			runs-on: ubuntu-latest
 			steps:
 					- run: echo "Downloading..."

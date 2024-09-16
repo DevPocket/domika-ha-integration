@@ -1,5 +1,6 @@
 name: Update from Home Assistant Core and create a HACS version
 run-name: Updating from Home Assistant Core and create a HACS version...
+runs-on: self-hosted
 on: []
 jobs:
 	Download-Extract-Commit-Push:

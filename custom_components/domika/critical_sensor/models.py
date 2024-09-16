@@ -1,12 +1,4 @@
-# vim: set fileencoding=utf-8
-"""
-Notification sensor.
-
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
+"""Critical sensor models."""
 
 from dataclasses import dataclass, field
 
@@ -20,7 +12,7 @@ class DomikaNotificationSensor(DataClassJSONMixin):
     """Notification sensor data."""
 
     entity_id: str
-    type: NotificationType = field(metadata={'serialize': lambda v: v.to_string()})
+    type: NotificationType = field(metadata={"serialize": lambda v: v.to_string()})
     name: str
     device_class: str
     state: str

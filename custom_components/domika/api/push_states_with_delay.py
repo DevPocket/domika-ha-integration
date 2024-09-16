@@ -1,30 +1,20 @@
-# vim: set fileencoding=utf-8
-"""
-Integration api.
-
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
+"""Integration push states api."""
 
 import asyncio
-import logging
-import uuid
 from http import HTTPStatus
 from typing import Any
+import uuid
 
-import domika_ha_framework.database.core as database_core
-import domika_ha_framework.push_data.service as push_data_service
 from aiohttp import web
+import domika_ha_framework.database.core as database_core
 from domika_ha_framework.errors import DomikaFrameworkBaseError
+import domika_ha_framework.push_data.service as push_data_service
+
 from homeassistant.core import async_get_hass
 from homeassistant.helpers.http import HomeAssistantView
 
-from ..const import DOMAIN
+from ..const import DOMAIN, LOGGER
 from ..ha_entity import service as ha_entity_service
-
-LOGGER = logging.getLogger(__name__)
 
 
 class DomikaAPIPushStatesWithDelay(HomeAssistantView):
@@ -32,9 +22,6 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
 
     url = "/domika/push_states_with_delay"
     name = "domika:push-states-with-delay"
-
-    def __init__(self) -> None:
-        super().__init__()
 
     async def post(self, request: web.Request) -> web.Response:
         """Post method."""
@@ -45,9 +32,8 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
 
         request_dict: dict[str, Any] = await request.json()
 
-        app_session_id = request.headers.get("X-App-Session-Id")
         try:
-            app_session_id = uuid.UUID(app_session_id)
+            app_session_id = uuid.UUID(request.headers.get("X-App-Session-Id"))
         except (TypeError, ValueError):
             return self.json_message(
                 "Missing or malformed X-App-Session-Id.",
@@ -83,10 +69,14 @@ class DomikaAPIPushStatesWithDelay(HomeAssistantView):
 
         except DomikaFrameworkBaseError as e:
             LOGGER.error("DomikaAPIPushStatesWithDelay. Framework error. %s", e)
-            return self.json_message("Framework error.", HTTPStatus.INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            LOGGER.exception("DomikaAPIPushStatesWithDelay. Unhandled error. %s", e)
-            return self.json_message("Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR)
+            return self.json_message(
+                "Framework error.", HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("DomikaAPIPushStatesWithDelay. Unhandled error")
+            return self.json_message(
+                "Internal error.", HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
         data = {"entities": result}
         LOGGER.debug("DomikaAPIPushStatesWithDelay data: %s", data)

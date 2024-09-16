@@ -1,19 +1,23 @@
 {
   "domain": "domika",
-  "name": "Domika Integration",
+  "name": "Domika",
   "version": "0.1",
-  "after_dependencies": ["http"],
   "codeowners": ["@bealex", "@bmikle"],
   "config_flow": true,
-  "single_config_entry": true,
-  "dependencies": ["websocket_api"],
-  "loggers": ["domika"],
-  "requirements": [
-    "aiohttp>=3.9.5",
-    "domika-ha-framework==0.0.1"
+  "dependencies": [
+    "api",
+    "binary_sensor",
+    "climate",
+    "cloud",
+    "light",
+    "network",
+    "search",
+    "sensor",
+    "websocket_api"
   ],
-  "documentation": "https://github.com/DevPocket/domika-ha-integration",
-  "issue_tracker": "https://github.com/DevPocket/domika-ha-integration/issues",
-  "integration_type": "service",
-  "quality_scale": "internal"
+  "documentation": "https://www.home-assistant.io/integrations/domika",
+  "iot_class": "local_polling",
+  "loggers": ["domika"],
+  "requirements": ["domika-ha-framework==0.0.3"],
+  "single_config_entry": true
 }

@@ -1,30 +1,26 @@
-# vim: set fileencoding=utf-8
-"""
-Application dashboard.
+"""Application dashboard router."""
 
-(c) DevPocket, 2024
+from typing import Any, cast
 
-
-Author(s): Artem Bezborodko
-"""
-
-import logging
-from typing import Any, Optional, cast
-
+from domika_ha_framework.dashboard.models import (
+    DomikaDashboardCreate,
+    DomikaDashboardRead,
+)
 import domika_ha_framework.dashboard.service as dashboard_service
 import domika_ha_framework.database.core as database_core
 import domika_ha_framework.device.service as device_service
-import voluptuous as vol
-from domika_ha_framework.dashboard.models import DomikaDashboardCreate, DomikaDashboardRead
 from domika_ha_framework.errors import DomikaFrameworkBaseError
+import voluptuous as vol
+
 from homeassistant.components.websocket_api.connection import ActiveConnection
-from homeassistant.components.websocket_api.decorators import async_response, websocket_command
+from homeassistant.components.websocket_api.decorators import (
+    async_response,
+    websocket_command,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from ..const import DOMAIN
-
-LOGGER = logging.getLogger(__name__)
+from ..const import DOMAIN, LOGGER
 
 
 async def _update_dashboards(
@@ -32,7 +28,7 @@ async def _update_dashboards(
     dashboards: str,
     hash_: str,
     user_id: str,
-):
+) -> None:
     try:
         async with database_core.get_session() as session:
             await dashboard_service.create_or_update(
@@ -61,12 +57,11 @@ async def _update_dashboards(
             user_id,
             e,
         )
-    except Exception as e:
+    except Exception:  # noqa: BLE001
         LOGGER.exception(
-            'Can\'t update dashboards "%s" for user "%s". Unhandled error. %s',
+            'Can\'t update dashboards "%s" for user "%s". Unhandled error',
             dashboards,
             user_id,
-            e,
         )
 
 
@@ -84,9 +79,9 @@ async def websocket_domika_update_dashboards(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika update dashboards request."""
-    msg_id: Optional[int] = msg.get("id")
+    msg_id: int | None = msg.get("id")
     if msg_id is None:
-        LOGGER.error('Got websocket message "update_dashboards", msg_id is missing.')
+        LOGGER.error('Got websocket message "update_dashboards", msg_id is missing')
         return
 
     LOGGER.debug(
@@ -100,10 +95,10 @@ async def websocket_domika_update_dashboards(
     LOGGER.debug("update_dashboards msg_id=%s data=%s", msg_id, {"result": "accepted"})
 
     domain_data: dict[str, Any] = hass.data.get(DOMAIN, {})
-    entry: Optional[ConfigEntry] = domain_data.get("entry")
+    entry: ConfigEntry | None = domain_data.get("entry")
 
     if not entry:
-        LOGGER.debug("update_dashboards Error. Entry not found.")
+        LOGGER.debug("update_dashboards Error. Entry not found")
         return
 
     entry.async_create_task(
@@ -130,9 +125,9 @@ async def websocket_domika_get_dashboards(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika get dashboards request."""
-    msg_id: Optional[int] = msg.get("id")
+    msg_id: int | None = msg.get("id")
     if msg_id is None:
-        LOGGER.error('Got websocket message "get_dashboards", msg_id is missing.')
+        LOGGER.error('Got websocket message "get_dashboards", msg_id is missing')
         return
 
     LOGGER.debug(
@@ -151,11 +146,10 @@ async def websocket_domika_get_dashboards(
             connection.user.id,
             e,
         )
-    except Exception as e:
+    except Exception:  # noqa: BLE001
         LOGGER.exception(
-            'Can\'t get dashboards for user "%s". Unhandled error. %s',
+            'Can\'t get dashboards for user "%s". Unhandled error',
             connection.user.id,
-            e,
         )
 
     result = (
@@ -180,9 +174,9 @@ async def websocket_domika_get_dashboards_hash(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika get dashboards hash update request."""
-    msg_id: Optional[int] = msg.get("id")
+    msg_id: int | None = msg.get("id")
     if msg_id is None:
-        LOGGER.error('Got websocket message "get_dashboards_hash", msg_id is missing.')
+        LOGGER.error('Got websocket message "get_dashboards_hash", msg_id is missing')
         return
 
     LOGGER.debug(
@@ -201,11 +195,10 @@ async def websocket_domika_get_dashboards_hash(
             connection.user.id,
             e,
         )
-    except Exception as e:
+    except Exception:  # noqa: BLE001
         LOGGER.exception(
-            'Can\'t get dashboards hash for user "%s". Unhandled error. %s',
+            'Can\'t get dashboards hash for user "%s". Unhandled error',
             connection.user.id,
-            e,
         )
 
     result = {"hash": dashboards.hash if dashboards else ""}

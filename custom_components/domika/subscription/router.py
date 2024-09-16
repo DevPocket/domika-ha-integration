@@ -1,27 +1,22 @@
-# vim: set fileencoding=utf-8
-"""
-Subscription data.
+"""Subscription data router."""
 
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
-
-import logging
+from typing import Any, cast
 import uuid
-from typing import Any, Optional, cast
 
 import domika_ha_framework.database.core as database_core
-import domika_ha_framework.subscription.flow as subscription_flow
-import voluptuous as vol
 from domika_ha_framework.errors import DomikaFrameworkBaseError
+import domika_ha_framework.subscription.flow as subscription_flow
 from domika_ha_framework.utils import flatten_json
+import voluptuous as vol
+
 from homeassistant.components.websocket_api.connection import ActiveConnection
-from homeassistant.components.websocket_api.decorators import async_response, websocket_command
+from homeassistant.components.websocket_api.decorators import (
+    async_response,
+    websocket_command,
+)
 from homeassistant.core import HomeAssistant
 
-LOGGER = logging.getLogger(__name__)
+from ..const import LOGGER
 
 
 @websocket_command(
@@ -38,9 +33,9 @@ async def websocket_domika_resubscribe(
     msg: dict[str, Any],
 ) -> None:
     """Handle domika resubscribe request."""
-    msg_id: Optional[int] = msg.get("id")
+    msg_id: int | None = msg.get("id")
     if msg_id is None:
-        LOGGER.error('Got websocket message "resubscribe", msg_id is missing.')
+        LOGGER.error('Got websocket message "resubscribe", msg_id is missing')
         return
 
     LOGGER.debug('Got websocket message "resubscribe", data: %s', msg)
@@ -64,7 +59,7 @@ async def websocket_domika_resubscribe(
             )
         else:
             LOGGER.error(
-                "websocket_domika_resubscribe requesting state of unknown entity: %s",
+                "Websocket_domika_resubscribe requesting state of unknown entity: %s",
                 entity_id,
             )
     connection.send_result(msg_id, {"entities": res_list})
@@ -74,5 +69,5 @@ async def websocket_domika_resubscribe(
             await subscription_flow.resubscribe(session, app_session_id, subscriptions)
     except DomikaFrameworkBaseError as e:
         LOGGER.error('Can\'t resubscribe "%s". Framework error. %s', subscriptions, e)
-    except Exception as e:
-        LOGGER.exception('Can\'t resubscribe "%s". Unhandled error. %s', subscriptions, e)
+    except Exception:  # noqa: BLE001
+        LOGGER.exception('Can\'t resubscribe "%s". Unhandled error', subscriptions)

@@ -1,40 +1,44 @@
-# vim: set fileencoding=utf-8
-"""
-Homeassistant event.
+"""HA event flow."""
 
-(c) DevPocket, 2024
-
-
-Author(s): Artem Bezborodko
-"""
-
+from collections.abc import Sequence
 import logging
 import uuid
-from typing import Sequence, Set
 
 import domika_ha_framework.database.core as database_core
-import domika_ha_framework.push_data.flow as push_data_flow
-import domika_ha_framework.subscription.flow as subscription_flow
 from domika_ha_framework.errors import DomikaFrameworkBaseError
-from domika_ha_framework.push_data.models import DomikaPushDataCreate
+import domika_ha_framework.push_data.flow as push_data_flow
+from domika_ha_framework.push_data.models import (
+    DomikaPushDataCreate,
+    DomikaPushedEvents,
+)
+import domika_ha_framework.subscription.flow as subscription_flow
 from domika_ha_framework.utils import flatten_json
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+
+from homeassistant.const import ATTR_DEVICE_CLASS
+from homeassistant.core import (
+    CompressedState,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from ..const import PUSH_DELAY_DEFAULT, PUSH_DELAY_FOR_DOMAIN
+from ..const import (
+    CRITICAL_PUSH_ALERT_STRINGS,
+    LOGGER,
+    PUSH_DELAY_DEFAULT,
+    PUSH_DELAY_FOR_DOMAIN,
+)
 from ..critical_sensor import service as critical_sensor_service
 from ..critical_sensor.enums import NotificationType
 
-LOGGER = logging.getLogger(__name__)
 
-DOMIKA_CRITICAL_SENSOR_CHANGED = "domika_critical_sensors_changed"
-
-
-async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData]):
+async def register_event(
+    hass: HomeAssistant,
+    event: Event[EventStateChangedData],
+) -> None:
     """Register new incoming HA event."""
     event_data: EventStateChangedData = event.data
-    if not event_data:
-        return
 
     entity_id = event_data["entity_id"]
 
@@ -76,12 +80,17 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
     ]
 
     critical_push_needed = (
-        critical_sensor_service.critical_push_needed(hass, entity_id) and ("s", "on") in attributes
+        critical_sensor_service.critical_push_needed(hass, entity_id)
+        and ("s", "on") in attributes
+    )
+
+    critical_alert_payload = (
+        _get_critical_alert_payload(hass, entity_id) if critical_push_needed else {}
     )
 
     try:
         async with database_core.get_session() as session:
-            # Get application id's associated with attribues.
+            # Get application id's associated with attributes.
             app_session_ids = await subscription_flow.get_app_session_id_by_attributes(
                 session,
                 entity_id,
@@ -100,30 +109,83 @@ async def register_event(hass: HomeAssistant, event: Event[EventStateChangedData
                     app_session_ids,
                 )
 
-            await push_data_flow.register_event(
+            pushed_events = await push_data_flow.register_event(
                 session,
                 async_get_clientsession(hass),
                 push_data=events,
                 critical_push_needed=critical_push_needed,
+                critical_alert_payload=critical_alert_payload,
             )
-    except DomikaFrameworkBaseError as e:
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                _log_pushed_events(pushed_events)
+    except DomikaFrameworkBaseError:
         LOGGER.exception(
-            "Can't register event entity: %s attributes %s. Framework error. %s",
+            "Can't register event entity: %s attributes %s. Framework error",
             entity_id,
             attributes,
-            e,
         )
 
 
-async def push_registered_events(hass: HomeAssistant):
+def _get_critical_alert_payload(hass: HomeAssistant, entity_id: str) -> dict:
+    """Create the payload for a critical push."""
+    alert_title = CRITICAL_PUSH_ALERT_STRINGS.get("default", "")
+    alert_body = hass.config.location_name
+
+    entity = hass.states.get(entity_id)
+    if entity:
+        entity_class = entity.attributes.get(ATTR_DEVICE_CLASS)
+        if entity_class:
+            alert_title = CRITICAL_PUSH_ALERT_STRINGS.get(entity_class) or alert_title
+
+        alert_body = f"{entity.name}, " + alert_body
+
+    return {"title-loc-key": alert_title, "body": alert_body}
+
+
+async def push_registered_events(hass: HomeAssistant) -> None:
     """Push registered events to the push server."""
     async with database_core.get_session() as session:
-        await push_data_flow.push_registered_events(session, async_get_clientsession(hass))
+        pushed_events = await push_data_flow.push_registered_events(
+            session, async_get_clientsession(hass)
+        )
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            _log_pushed_events(pushed_events)
 
 
-def _get_changed_attributes_from_event_data(event_data: EventStateChangedData) -> Set:
-    old_state = event_data["old_state"].as_compressed_state if event_data["old_state"] else {}
-    new_state = event_data["new_state"].as_compressed_state if event_data["new_state"] else {}
+def _log_pushed_events(
+    pushed_events: list[DomikaPushedEvents],
+    max_events_msg_len: int = 1000,
+) -> None:
+    for pushed_event in pushed_events:
+        attributes_count = 0
+        for entity in pushed_event.events.values():
+            attributes_count += len(entity)
+
+        # Entities with their changed attributes.
+        data = str(pushed_event.events)
+        data = (
+            data[:max_events_msg_len] + "..."
+            if len(data) > max_events_msg_len
+            else data
+        )
+
+        LOGGER.debug(
+            "Pushed %s changed attributes in %s entities for %s push_session_id: %s",
+            attributes_count,
+            len(pushed_event.events),
+            pushed_event.push_session_id,
+            data,
+        )
+
+
+def _get_changed_attributes_from_event_data(event_data: EventStateChangedData) -> set:
+    old_state: CompressedState | dict = {}
+    if event_data["old_state"]:
+        old_state = event_data["old_state"].as_compressed_state
+
+    new_state: CompressedState | dict = {}
+    if event_data["new_state"]:
+        new_state = event_data["new_state"].as_compressed_state
 
     # Make a flat dict from state data.
     old_attributes = flatten_json(old_state, exclude={"c", "lc", "lu"}) or {}
@@ -136,17 +198,17 @@ def _get_changed_attributes_from_event_data(event_data: EventStateChangedData) -
 def _fire_critical_sensor_notification(
     hass: HomeAssistant,
     event: Event[EventStateChangedData],
-):
+) -> None:
     # If entity id is a critical binary sensor.
     # Fetch state for all levels of critical binary sensors.
     sensors_data = critical_sensor_service.get(hass, NotificationType.ANY)
     # Fire the event for app.
     hass.bus.async_fire(
-        DOMIKA_CRITICAL_SENSOR_CHANGED,
+        "domika_critical_sensors_changed",
         sensors_data.to_dict(),
         event.origin,
         event.context,
-        event.time_fired.timestamp(),  # TODO: convert to int?
+        event.time_fired.timestamp(),
     )
 
 
@@ -157,7 +219,7 @@ def _fire_event_to_app_session_ids(
     entity_id: str,
     attributes: set[tuple],
     app_session_ids: Sequence[uuid.UUID],
-):
+) -> None:
     dict_attributes = dict(attributes)
     dict_attributes["d.type"] = "state_changed"
     dict_attributes["event_id"] = event_id

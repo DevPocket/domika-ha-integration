@@ -1,6 +1,7 @@
 {
   "domain": "domika",
   "name": "Domika",
+  "version": "0.1",
   "codeowners": ["@bealex", "@bmikle"],
   "config_flow": true,
   "dependencies": [
